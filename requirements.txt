@@ -1,7 +1,7 @@
 
 
 
-crewai
+crewai[litellm]
 streamlit
 pandas
 openpyxl
