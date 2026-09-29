@@ -1,0 +1,14 @@
+{
+    "po_number": "PO-2002",
+    "vendor_name": "XYZ Tech Solutions",
+    "currency": "USD",
+    "items": [
+        {
+            "item_description": "Monitor",
+            "quantity": 3,
+            "unit_price": 500,
+            "line_total": 1500
+        }
+    ],
+    "total": 1500
+}
