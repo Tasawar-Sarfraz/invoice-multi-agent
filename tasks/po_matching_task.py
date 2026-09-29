@@ -10,7 +10,6 @@ def create_po_matching_task(agent, extraction_task):
         Use the invoice data produced by Agent 2.
 
         Compare:
-
         - Vendor
         - PO number
         - Items
@@ -20,11 +19,9 @@ def create_po_matching_task(agent, extraction_task):
         - Currency
 
         Never modify invoice or PO data.
-
         Never approve or reject the invoice.
 
         Valid results:
-
         MATCH
         MISMATCH
         PO_NOT_FOUND
@@ -33,7 +30,6 @@ def create_po_matching_task(agent, extraction_task):
         SECURITY_ALERT
 
         For mismatches provide:
-
         - field
         - invoice value
         - PO value
@@ -42,15 +38,15 @@ def create_po_matching_task(agent, extraction_task):
 
         Return:
 
-        {
+        {{
             "status": "...",
             "invoice_id": "...",
             "po_id": "...",
-            "comparison": {},
+            "comparison": {{}},
             "mismatches": [],
             "reason": "...",
             "security_flags": []
-        }
+        }}
         """,
         expected_output="Structured invoice and PO validation result.",
         agent=agent,
