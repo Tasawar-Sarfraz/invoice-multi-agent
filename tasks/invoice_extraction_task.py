@@ -1,4 +1,4 @@
-```python
+
 from crewai import Task
 
 
@@ -34,4 +34,3 @@ def create_invoice_extraction_task(agent, classification_task):
         agent=agent,
         context=[classification_task],
     )
-```
