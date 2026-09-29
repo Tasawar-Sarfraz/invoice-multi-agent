@@ -1,3 +1,4 @@
+
 import json
 
 from crewai.tools import BaseTool
@@ -9,25 +10,38 @@ class SaveInvoiceTool(BaseTool):
     name: str = "save_invoice_record"
 
     description: str = (
-        "Save extracted invoice data into the invoice database. "
-        "Only invoice workflow fields may be written."
+        "Save structured invoice data into the invoice database. "
+        "The input must contain actual extracted invoice fields."
     )
 
     def _run(self, invoice_data: str) -> str:
         try:
             data = json.loads(invoice_data)
 
-            # Agent 2 may return the actual invoice fields
-            # inside the extracted_data object.
+            # --------------------------------------------------
+            # Handle nested extracted_data
+            # --------------------------------------------------
+
             if isinstance(data.get("extracted_data"), dict):
                 data = data["extracted_data"]
 
-            # Normalize field names
-            if "vendor" in data and "vendor_name" not in data:
+            # --------------------------------------------------
+            # Normalize vendor field
+            # --------------------------------------------------
+
+            if "vendor" in data:
                 data["vendor_name"] = data["vendor"]
 
-            if "po_number" in data and "PO_number" not in data:
+            # --------------------------------------------------
+            # Normalize PO field
+            # --------------------------------------------------
+
+            if "po_number" in data:
                 data["PO_number"] = data["po_number"]
+
+            # --------------------------------------------------
+            # Validate important fields
+            # --------------------------------------------------
 
             required_fields = [
                 "vendor_name",
@@ -42,12 +56,35 @@ class SaveInvoiceTool(BaseTool):
                 "shipping",
                 "total",
                 "payment_terms",
-                "extraction_status",
             ]
 
-            for field in required_fields:
-                if field not in data:
-                    data[field] = "UNKNOWN"
+            missing_fields = [
+                field
+                for field in required_fields
+                if field not in data
+            ]
+
+            # --------------------------------------------------
+            # Do NOT silently save incomplete invoices
+            # --------------------------------------------------
+
+            if missing_fields:
+                return json.dumps(
+                    {
+                        "status": "FAILED",
+                        "reason": "Required invoice fields are missing.",
+                        "missing_fields": missing_fields,
+                    }
+                )
+
+            # --------------------------------------------------
+            # Save invoice
+            # --------------------------------------------------
+
+            data["extraction_status"] = data.get(
+                "extraction_status",
+                "SUCCESS",
+            )
 
             invoice_id = create_invoice_record(data)
 
@@ -84,3 +121,4 @@ class SaveInvoiceTool(BaseTool):
                     "reason": str(error),
                 }
             )
+
