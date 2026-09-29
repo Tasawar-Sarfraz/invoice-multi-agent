@@ -1,4 +1,4 @@
-```python
+
 from crewai import Task
 
 
@@ -56,4 +56,4 @@ def create_po_matching_task(agent, extraction_task):
         agent=agent,
         context=[extraction_task],
     )
-```
+
