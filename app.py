@@ -1,98 +1,5 @@
 
-# import sqlite3
-# from pathlib import Path
-
-# import streamlit as st
-
-# from tools.database_tool import initialize_database
-# from crew.invoice_crew import create_invoice_processing_crew
-
-
-# st.set_page_config(
-#     page_title="Invoice Processing System",
-#     layout="wide",
-# )
-
-# initialize_database()
-
-# st.title("Invoice Processing Multi-Agent System")
-
-# email_content = st.text_area(
-#     "Incoming Email",
-#     height=250,
-#     placeholder="Paste invoice email here...",
-# )
-
-
-# if st.button("Run Invoice Workflow"):
-
-#     if not email_content.strip():
-#         st.warning("Please enter an email.")
-
-#     else:
-#         crew = create_invoice_processing_crew()
-
-#         result = crew.kickoff(
-#             inputs={
-#                 "email_content": email_content
-#             }
-#         )
-
-#         st.subheader("Workflow Result")
-#         st.write(result)
-
-#         # Database verification
-#         database_path = (
-#             Path(__file__).resolve().parent
-#             / "database"
-#             / "invoices.db"
-#         )
-
-#         connection = sqlite3.connect(database_path)
-
-#         cursor = connection.cursor()
-
-#         rows = cursor.execute(
-#             """
-#             SELECT
-#                 invoice_id,
-#                 vendor_name,
-#                 invoice_number,
-#                 po_number,
-#                 total,
-#                 extraction_status,
-#                 verification_status,
-#                 approval_status
-#             FROM invoices
-#             ORDER BY invoice_id DESC
-#             LIMIT 5
-#             """
-#         ).fetchall()
-
-#         connection.close()
-
-#         st.subheader("Database Records")
-
-#         if rows:
-#             st.dataframe(
-#                 rows,
-#                 column_config={
-#                     0: "Invoice ID",
-#                     1: "Vendor",
-#                     2: "Invoice Number",
-#                     3: "PO Number",
-#                     4: "Total",
-#                     5: "Extraction Status",
-#                     6: "Verification Status",
-#                     7: "Approval Status",
-#                 },
-#                 use_container_width=True,
-#             )
-#         else:
-#             st.info("No invoice records found in the database.")
-
-
-
+import json
 import sqlite3
 from pathlib import Path
 
@@ -117,6 +24,17 @@ initialize_database()
 
 
 st.title("Invoice Processing Multi-Agent System")
+
+
+# ============================================================
+# DATABASE PATH
+# ============================================================
+
+database_path = (
+    Path(__file__).resolve().parent
+    / "database"
+    / "invoices.db"
+)
 
 
 # ============================================================
@@ -150,18 +68,129 @@ if st.button("Run Invoice Workflow"):
             }
         )
 
+        # ----------------------------------------------------
+        # Extract only the final workflow result
+        # ----------------------------------------------------
+
+        workflow_raw = getattr(result, "raw", "")
+
+        try:
+            workflow_data = json.loads(workflow_raw)
+        except (json.JSONDecodeError, TypeError):
+            workflow_data = None
+
         st.subheader("Workflow Result")
-        st.write(result)
 
-        # ----------------------------------------------------
-        # Generate approval token for latest pending invoice
-        # ----------------------------------------------------
+        if workflow_data:
 
-        database_path = (
-            Path(__file__).resolve().parent
-            / "database"
-            / "invoices.db"
-        )
+            status = workflow_data.get("status", "UNKNOWN")
+            invoice_id = workflow_data.get("invoice_id", "UNKNOWN")
+            po_id = workflow_data.get("po_id", "UNKNOWN")
+            comparison = workflow_data.get("comparison", {})
+            mismatches = workflow_data.get("mismatches", [])
+            reason = workflow_data.get("reason", "")
+            security_flags = workflow_data.get(
+                "security_flags",
+                [],
+            )
+
+            # ------------------------------------------------
+            # Status
+            # ------------------------------------------------
+
+            if status == "MATCH":
+                st.success(f"Status: {status}")
+
+            elif status in {
+                "MISMATCH",
+                "SECURITY_ALERT",
+            }:
+                st.error(f"Status: {status}")
+
+            else:
+                st.warning(f"Status: {status}")
+
+            # ------------------------------------------------
+            # Basic information
+            # ------------------------------------------------
+
+            col1, col2 = st.columns(2)
+
+            with col1:
+                st.write(f"**Invoice ID:** {invoice_id}")
+
+            with col2:
+                st.write(f"**PO ID:** {po_id}")
+
+            # ------------------------------------------------
+            # Comparison
+            # ------------------------------------------------
+
+            if comparison:
+
+                st.write("**Comparison**")
+
+                comparison_rows = [
+                    {
+                        "Field": field.replace("_", " ").title(),
+                        "Result": "MATCHED" if value else "NOT MATCHED",
+                    }
+                    for field, value in comparison.items()
+                ]
+
+                st.dataframe(
+                    comparison_rows,
+                    use_container_width=True,
+                    hide_index=True,
+                )
+
+            # ------------------------------------------------
+            # Mismatches
+            # ------------------------------------------------
+
+            if mismatches:
+
+                st.write("**Mismatches**")
+                st.json(mismatches)
+
+            else:
+
+                st.write("**Mismatches:** None")
+
+            # ------------------------------------------------
+            # Reason
+            # ------------------------------------------------
+
+            if reason:
+                st.write(f"**Reason:** {reason}")
+
+            # ------------------------------------------------
+            # Security flags
+            # ------------------------------------------------
+
+            if security_flags:
+
+                st.error("Security Flags Detected")
+
+                st.json(security_flags)
+
+            else:
+
+                st.write("**Security Flags:** None")
+
+        else:
+
+            st.warning(
+                "Workflow completed, but the final result "
+                "could not be parsed."
+            )
+
+            st.write(workflow_raw)
+
+
+        # ====================================================
+        # GENERATE APPROVAL TOKEN
+        # ====================================================
 
         connection = sqlite3.connect(database_path)
 
@@ -184,6 +213,7 @@ if st.button("Run Invoice Workflow"):
 
         connection.close()
 
+
         if latest_invoice:
 
             invoice_id = latest_invoice[0]
@@ -196,8 +226,8 @@ if st.button("Run Invoice Workflow"):
                 if token:
 
                     st.success(
-                        f"Approval token generated for Invoice ID "
-                        f"{invoice_id}."
+                        f"Approval token generated for "
+                        f"Invoice ID {invoice_id}."
                     )
 
                     st.code(
@@ -216,9 +246,9 @@ if st.button("Run Invoice Workflow"):
                     )
 
 
-        # ----------------------------------------------------
-        # Database verification
-        # ----------------------------------------------------
+        # ====================================================
+        # DATABASE VERIFICATION
+        # ====================================================
 
         connection = sqlite3.connect(database_path)
 
@@ -243,6 +273,7 @@ if st.button("Run Invoice Workflow"):
 
         connection.close()
 
+
         st.subheader("Database Records")
 
         if rows:
@@ -260,6 +291,7 @@ if st.button("Run Invoice Workflow"):
                     7: "Approval Status",
                 },
                 use_container_width=True,
+                hide_index=True,
             )
 
         else:
@@ -278,12 +310,9 @@ st.divider()
 st.header("Manager Approval")
 
 
-database_path = (
-    Path(__file__).resolve().parent
-    / "database"
-    / "invoices.db"
-)
-
+# ============================================================
+# GET PENDING INVOICES
+# ============================================================
 
 connection = sqlite3.connect(database_path)
 
@@ -324,7 +353,13 @@ if pending_invoices:
             6: "Approval Status",
         },
         use_container_width=True,
+        hide_index=True,
     )
+
+
+    # ========================================================
+    # SELECT INVOICE
+    # ========================================================
 
     invoice_options = {
         f"Invoice {row[0]} - {row[2]}": row[0]
@@ -338,11 +373,17 @@ if pending_invoices:
 
     selected_invoice_id = invoice_options[selected_invoice]
 
+
+    # ========================================================
+    # APPROVAL TOKEN
+    # ========================================================
+
     approval_token = st.text_input(
         "Approval Token",
         type="password",
         placeholder="Enter approval token...",
     )
+
 
     col1, col2 = st.columns(2)
 
@@ -378,9 +419,85 @@ if pending_invoices:
                     }
                 )
 
+                # --------------------------------------------
+                # Show only clean approval result
+                # --------------------------------------------
+
+                approval_raw = getattr(
+                    approval_result,
+                    "raw",
+                    "",
+                )
+
                 st.subheader("Approval Result")
 
-                st.write(approval_result)
+                try:
+                    approval_data = json.loads(approval_raw)
+                except (json.JSONDecodeError, TypeError):
+                    approval_data = None
+
+                if approval_data:
+
+                    database_update = approval_data.get(
+                        "database_update",
+                        "UNKNOWN",
+                    )
+
+                    if database_update == "SUCCESS":
+
+                        st.success(
+                            "Invoice approved successfully."
+                        )
+
+                    elif database_update == "NOT_PERMITTED":
+
+                        st.error(
+                            "Approval was not permitted."
+                        )
+
+                    else:
+
+                        st.warning(
+                            "Approval processing failed."
+                        )
+
+                    st.write(
+                        f"**Invoice ID:** "
+                        f"{approval_data.get('invoice_id', 'UNKNOWN')}"
+                    )
+
+                    st.write(
+                        f"**Approval Status:** "
+                        f"{approval_data.get('approval_status', 'UNKNOWN')}"
+                    )
+
+                    st.write(
+                        f"**Database Update:** "
+                        f"{database_update}"
+                    )
+
+                    st.write(
+                        f"**Reason:** "
+                        f"{approval_data.get('reason', '')}"
+                    )
+
+                    security_flags = approval_data.get(
+                        "security_flags",
+                        [],
+                    )
+
+                    if security_flags:
+                        st.error("Security Flags")
+                        st.json(security_flags)
+
+                else:
+
+                    st.warning(
+                        "Approval processing completed, "
+                        "but the result could not be parsed."
+                    )
+
+                    st.write(approval_raw)
 
                 st.rerun()
 
@@ -416,9 +533,85 @@ if pending_invoices:
                     }
                 )
 
+                # --------------------------------------------
+                # Show only clean approval result
+                # --------------------------------------------
+
+                approval_raw = getattr(
+                    approval_result,
+                    "raw",
+                    "",
+                )
+
                 st.subheader("Approval Result")
 
-                st.write(approval_result)
+                try:
+                    approval_data = json.loads(approval_raw)
+                except (json.JSONDecodeError, TypeError):
+                    approval_data = None
+
+                if approval_data:
+
+                    database_update = approval_data.get(
+                        "database_update",
+                        "UNKNOWN",
+                    )
+
+                    if database_update == "SUCCESS":
+
+                        st.success(
+                            "Invoice rejected successfully."
+                        )
+
+                    elif database_update == "NOT_PERMITTED":
+
+                        st.error(
+                            "Rejection was not permitted."
+                        )
+
+                    else:
+
+                        st.warning(
+                            "Rejection processing failed."
+                        )
+
+                    st.write(
+                        f"**Invoice ID:** "
+                        f"{approval_data.get('invoice_id', 'UNKNOWN')}"
+                    )
+
+                    st.write(
+                        f"**Approval Status:** "
+                        f"{approval_data.get('approval_status', 'UNKNOWN')}"
+                    )
+
+                    st.write(
+                        f"**Database Update:** "
+                        f"{database_update}"
+                    )
+
+                    st.write(
+                        f"**Reason:** "
+                        f"{approval_data.get('reason', '')}"
+                    )
+
+                    security_flags = approval_data.get(
+                        "security_flags",
+                        [],
+                    )
+
+                    if security_flags:
+                        st.error("Security Flags")
+                        st.json(security_flags)
+
+                else:
+
+                    st.warning(
+                        "Approval processing completed, "
+                        "but the result could not be parsed."
+                    )
+
+                    st.write(approval_raw)
 
                 st.rerun()
 
@@ -428,6 +621,4 @@ else:
     st.info(
         "No pending invoices available for manager approval."
     )
-
-
 
