@@ -512,41 +512,11 @@ if st.button(
         # Generate approval token for latest PENDING invoice
         # ----------------------------------------------------
 
-        latest_invoice = get_latest_invoice()
+    
 
-        if latest_invoice:
-
-            latest_invoice_id = latest_invoice[0]
-            approval_status = latest_invoice[8]
-
-            if approval_status == "PENDING":
-
-                token = create_approval_token(
-                    latest_invoice_id
-                )
-
-                if token:
-
-                    st.success(
-                        f"Approval token generated for "
-                        f"Invoice ID {latest_invoice_id}."
-                    )
-
-                    st.code(
-                        token,
-                        language="text",
-                    )
-
-                    st.info(
-                        "Copy this token and use it in "
-                        "the Manager Approval section."
-                    )
-
-                else:
-
-                    st.warning(
-                        "Could not generate approval token."
-                    )
+        
+                    
+                  
 
         # ----------------------------------------------------
         # Database records
@@ -646,11 +616,42 @@ if pending_invoices:
     # Generate Approval Token
     # --------------------------------------------------------
 
-   
+    st.write(
+        "### Approval Token"
+    )
 
-       
+    if st.button(
+        "Generate Approval Token",
+        use_container_width=True,
+    ):
 
-           
+        token = create_approval_token(
+            selected_invoice_id
+        )
+
+        if token:
+
+            st.success(
+                f"New approval token generated "
+                f"for Invoice ID {selected_invoice_id}."
+            )
+
+            st.code(
+                token,
+                language="text",
+            )
+
+            st.info(
+                "Copy this token before approving "
+                "or rejecting the invoice."
+            )
+
+        else:
+
+            st.error(
+                "Could not generate approval token."
+            )
+
     # --------------------------------------------------------
     # Enter Approval Token
     # --------------------------------------------------------
@@ -804,7 +805,7 @@ if pending_invoices:
                         approval_raw
                     )
 
-              
+           
 
     # ========================================================
     # REJECT
@@ -947,7 +948,7 @@ if pending_invoices:
                         approval_raw
                     )
 
-            
+                
 
 else:
 
