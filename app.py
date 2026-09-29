@@ -9,6 +9,7 @@ from tools.database_tool import (
     initialize_database,
     create_approval_token,
 )
+
 from crew.invoice_crew import (
     create_invoice_processing_crew,
     create_approval_processing_crew,
@@ -39,7 +40,7 @@ database_path = (
 
 
 # ============================================================
-# HELPER FUNCTIONS
+# DATABASE HELPERS
 # ============================================================
 
 def get_latest_invoice():
@@ -52,9 +53,16 @@ def get_latest_invoice():
             invoice_id,
             vendor_name,
             invoice_number,
-            po_number,
-            total,
+            invoice_date,
+            due_date,
             currency,
+            po_number,
+            items,
+            subtotal,
+            tax,
+            shipping,
+            total,
+            payment_terms,
             extraction_status,
             verification_status,
             approval_status
@@ -77,8 +85,8 @@ def get_pending_invoices():
         """
         SELECT
             invoice_id,
-            vendor_name,
             invoice_number,
+            vendor_name,
             po_number,
             total,
             currency,
@@ -102,10 +110,11 @@ def get_recent_invoices():
         """
         SELECT
             invoice_id,
-            vendor_name,
             invoice_number,
+            vendor_name,
             po_number,
             total,
+            currency,
             extraction_status,
             verification_status,
             approval_status
@@ -120,9 +129,13 @@ def get_recent_invoices():
     return rows
 
 
+# ============================================================
+# CREWAI RESULT HELPERS
+# ============================================================
+
 def extract_task_results(crew_result):
     """
-    Extract raw outputs from all CrewAI tasks.
+    Extract JSON results from all CrewAI tasks.
     """
 
     task_results = []
@@ -146,9 +159,14 @@ def extract_task_results(crew_result):
 
         try:
             data = json.loads(raw)
-            task_results.append(data)
 
-        except (json.JSONDecodeError, TypeError):
+            if isinstance(data, dict):
+                task_results.append(data)
+
+        except (
+            json.JSONDecodeError,
+            TypeError,
+        ):
             continue
 
     return task_results
@@ -156,7 +174,7 @@ def extract_task_results(crew_result):
 
 def find_result_by_key(task_results, key):
     """
-    Find a task result containing a specific key.
+    Find a task result containing the requested key.
     """
 
     for result in task_results:
@@ -167,18 +185,24 @@ def find_result_by_key(task_results, key):
     return None
 
 
+# ============================================================
+# DISPLAY WORKFLOW RESULTS
+# ============================================================
+
 def display_workflow_results(crew_result):
-    """
-    Display clean results from Agent 1, Agent 2 and Agent 3.
-    """
 
-    task_results = extract_task_results(crew_result)
+    task_results = extract_task_results(
+        crew_result
+    )
 
-    st.subheader("Workflow Result")
+    st.subheader(
+        "Workflow Result"
+    )
 
-    # --------------------------------------------------------
-    # Agent 1
-    # --------------------------------------------------------
+
+    # ========================================================
+    # AGENT 1
+    # ========================================================
 
     classification_result = find_result_by_key(
         task_results,
@@ -186,6 +210,10 @@ def display_workflow_results(crew_result):
     )
 
     if classification_result:
+
+        st.write(
+            "### Agent 1 — Email Classification"
+        )
 
         classification = classification_result.get(
             "classification",
@@ -197,24 +225,26 @@ def display_workflow_results(crew_result):
             "",
         )
 
-        st.write("### Agent 1 — Email Classification")
-
         if classification == "INVOICE":
+
             st.success(
                 f"Classification: {classification}"
             )
 
         elif classification == "SECURITY_ALERT":
+
             st.error(
                 f"Classification: {classification}"
             )
 
         else:
+
             st.warning(
                 f"Classification: {classification}"
             )
 
         if reason:
+
             st.write(
                 f"**Reason:** {reason}"
             )
@@ -225,12 +255,19 @@ def display_workflow_results(crew_result):
         )
 
         if security_flags:
-            st.error("Security Flags")
-            st.json(security_flags)
 
-    # --------------------------------------------------------
-    # Agent 2
-    # --------------------------------------------------------
+            st.error(
+                "Security Flags"
+            )
+
+            st.json(
+                security_flags
+            )
+
+
+    # ========================================================
+    # AGENT 2
+    # ========================================================
 
     extraction_result = find_result_by_key(
         task_results,
@@ -239,18 +276,23 @@ def display_workflow_results(crew_result):
 
     if extraction_result:
 
+        st.write(
+            "### Agent 2 — Invoice Extraction"
+        )
+
         extraction_status = extraction_result.get(
             "extraction_status",
             "UNKNOWN",
         )
 
-        st.write("### Agent 2 — Invoice Extraction")
-
         if extraction_status == "SUCCESS":
+
             st.success(
                 f"Extraction Status: {extraction_status}"
             )
+
         else:
+
             st.warning(
                 f"Extraction Status: {extraction_status}"
             )
@@ -271,9 +313,154 @@ def display_workflow_results(crew_result):
 
         if extracted_data:
 
-            st.write("**Extracted Invoice Data**")
+            st.write(
+                "**Extracted Invoice Details**"
+            )
 
-            st.json(extracted_data)
+            # ------------------------------------------------
+            # Basic invoice information
+            # ------------------------------------------------
+
+            invoice_columns = [
+                {
+                    "Field": "Vendor",
+                    "Value": extracted_data.get(
+                        "vendor",
+                        extracted_data.get(
+                            "vendor_name",
+                            "UNKNOWN",
+                        ),
+                    ),
+                },
+                {
+                    "Field": "Invoice Number",
+                    "Value": extracted_data.get(
+                        "invoice_number",
+                        "UNKNOWN",
+                    ),
+                },
+                {
+                    "Field": "Invoice Date",
+                    "Value": extracted_data.get(
+                        "invoice_date",
+                        "UNKNOWN",
+                    ),
+                },
+                {
+                    "Field": "Due Date",
+                    "Value": extracted_data.get(
+                        "due_date",
+                        "UNKNOWN",
+                    ),
+                },
+                {
+                    "Field": "PO Number",
+                    "Value": extracted_data.get(
+                        "po_number",
+                        extracted_data.get(
+                            "PO_number",
+                            "UNKNOWN",
+                        ),
+                    ),
+                },
+                {
+                    "Field": "Currency",
+                    "Value": extracted_data.get(
+                        "currency",
+                        "UNKNOWN",
+                    ),
+                },
+                {
+                    "Field": "Subtotal",
+                    "Value": extracted_data.get(
+                        "subtotal",
+                        "UNKNOWN",
+                    ),
+                },
+                {
+                    "Field": "Tax",
+                    "Value": extracted_data.get(
+                        "tax",
+                        "UNKNOWN",
+                    ),
+                },
+                {
+                    "Field": "Shipping",
+                    "Value": extracted_data.get(
+                        "shipping",
+                        "UNKNOWN",
+                    ),
+                },
+                {
+                    "Field": "Total",
+                    "Value": extracted_data.get(
+                        "total",
+                        "UNKNOWN",
+                    ),
+                },
+                {
+                    "Field": "Payment Terms",
+                    "Value": extracted_data.get(
+                        "payment_terms",
+                        "UNKNOWN",
+                    ),
+                },
+            ]
+
+            st.dataframe(
+                invoice_columns,
+                use_container_width=True,
+                hide_index=True,
+            )
+
+            # ------------------------------------------------
+            # Invoice Items
+            # ------------------------------------------------
+
+            items = extracted_data.get(
+                "items",
+                [],
+            )
+
+            if items:
+
+                st.write(
+                    "**Invoice Items**"
+                )
+
+                item_rows = []
+
+                for item in items:
+
+                    item_rows.append(
+                        {
+                            "Item": item.get(
+                                "item_description",
+                                item.get(
+                                    "description",
+                                    "UNKNOWN",
+                                ),
+                            ),
+                            "Quantity": item.get(
+                                "quantity",
+                                "UNKNOWN",
+                            ),
+                            "Unit Price": item.get(
+                                "unit_price",
+                                "UNKNOWN",
+                            ),
+                            "Line Total": item.get(
+                                "line_total",
+                                "UNKNOWN",
+                            ),
+                        }
+                    )
+
+                st.dataframe(
+                    item_rows,
+                    use_container_width=True,
+                    hide_index=True,
+                )
 
         uncertain_fields = extraction_result.get(
             "uncertain_fields",
@@ -282,9 +469,13 @@ def display_workflow_results(crew_result):
 
         if uncertain_fields:
 
-            st.warning("Uncertain Fields")
+            st.warning(
+                "Uncertain Fields"
+            )
 
-            st.json(uncertain_fields)
+            st.json(
+                uncertain_fields
+            )
 
         security_flags = extraction_result.get(
             "security_flags",
@@ -293,13 +484,18 @@ def display_workflow_results(crew_result):
 
         if security_flags:
 
-            st.error("Security Flags")
+            st.error(
+                "Security Flags"
+            )
 
-            st.json(security_flags)
+            st.json(
+                security_flags
+            )
 
-    # --------------------------------------------------------
-    # Agent 3
-    # --------------------------------------------------------
+
+    # ========================================================
+    # AGENT 3
+    # ========================================================
 
     matching_result = find_result_by_key(
         task_results,
@@ -307,6 +503,10 @@ def display_workflow_results(crew_result):
     )
 
     if matching_result:
+
+        st.write(
+            "### Agent 3 — Purchase Order Matching"
+        )
 
         status = matching_result.get(
             "status",
@@ -343,9 +543,8 @@ def display_workflow_results(crew_result):
             [],
         )
 
-        st.write("### Agent 3 — PO Matching")
-
         if status == "MATCH":
+
             st.success(
                 f"PO Matching Status: {status}"
             )
@@ -354,11 +553,13 @@ def display_workflow_results(crew_result):
             "MISMATCH",
             "SECURITY_ALERT",
         }:
+
             st.error(
                 f"PO Matching Status: {status}"
             )
 
         else:
+
             st.warning(
                 f"PO Matching Status: {status}"
             )
@@ -366,31 +567,36 @@ def display_workflow_results(crew_result):
         col1, col2 = st.columns(2)
 
         with col1:
+
             st.write(
                 f"**Invoice ID:** {invoice_id}"
             )
 
         with col2:
+
             st.write(
                 f"**PO ID:** {po_id}"
             )
 
         if comparison:
 
-            comparison_rows = [
-                {
-                    "Field": field.replace(
-                        "_",
-                        " ",
-                    ).title(),
-                    "Result": (
-                        "MATCHED"
-                        if value
-                        else "NOT MATCHED"
-                    ),
-                }
-                for field, value in comparison.items()
-            ]
+            comparison_rows = []
+
+            for field, value in comparison.items():
+
+                comparison_rows.append(
+                    {
+                        "Field": field.replace(
+                            "_",
+                            " ",
+                        ).title(),
+                        "Result": (
+                            "MATCHED"
+                            if value
+                            else "NOT MATCHED"
+                        ),
+                    }
+                )
 
             st.dataframe(
                 comparison_rows,
@@ -400,13 +606,19 @@ def display_workflow_results(crew_result):
 
         if mismatches:
 
-            st.write("**Mismatches**")
+            st.write(
+                "**Mismatches**"
+            )
 
-            st.json(mismatches)
+            st.json(
+                mismatches
+            )
 
         else:
 
-            st.write("**Mismatches:** None")
+            st.write(
+                "**Mismatches:** None"
+            )
 
         if reason:
 
@@ -416,9 +628,13 @@ def display_workflow_results(crew_result):
 
         if security_flags:
 
-            st.error("Security Flags")
+            st.error(
+                "Security Flags"
+            )
 
-            st.json(security_flags)
+            st.json(
+                security_flags
+            )
 
         else:
 
@@ -426,30 +642,90 @@ def display_workflow_results(crew_result):
                 "**Security Flags:** None"
             )
 
-    # --------------------------------------------------------
-    # Database Status
-    # --------------------------------------------------------
+
+    # ========================================================
+    # DATABASE STATUS
+    # ========================================================
 
     latest_invoice = get_latest_invoice()
 
     if latest_invoice:
 
-        st.write("### Database Status")
+        st.write(
+            "### Database Status"
+        )
 
         st.success(
             "Invoice record created successfully."
         )
 
-        st.write(
-            f"**Invoice ID:** {latest_invoice[0]}"
-        )
+        database_rows = [
+            {
+                "Field": "Invoice ID",
+                "Value": latest_invoice[0],
+            },
+            {
+                "Field": "Vendor",
+                "Value": latest_invoice[1],
+            },
+            {
+                "Field": "Invoice Number",
+                "Value": latest_invoice[2],
+            },
+            {
+                "Field": "Invoice Date",
+                "Value": latest_invoice[3],
+            },
+            {
+                "Field": "Due Date",
+                "Value": latest_invoice[4],
+            },
+            {
+                "Field": "Currency",
+                "Value": latest_invoice[5],
+            },
+            {
+                "Field": "PO Number",
+                "Value": latest_invoice[6],
+            },
+            {
+                "Field": "Subtotal",
+                "Value": latest_invoice[8],
+            },
+            {
+                "Field": "Tax",
+                "Value": latest_invoice[9],
+            },
+            {
+                "Field": "Shipping",
+                "Value": latest_invoice[10],
+            },
+            {
+                "Field": "Total",
+                "Value": latest_invoice[11],
+            },
+            {
+                "Field": "Payment Terms",
+                "Value": latest_invoice[12],
+            },
+            {
+                "Field": "Extraction Status",
+                "Value": latest_invoice[13],
+            },
+            {
+                "Field": "Verification Status",
+                "Value": latest_invoice[14],
+            },
+            {
+                "Field": "Approval Status",
+                "Value": latest_invoice[15],
+            },
+        ]
 
-        st.write(
-            f"**Invoice Number:** {latest_invoice[2]}"
-        )
-
-        st.write(
-            f"**Approval Status:** {latest_invoice[8]}"
+        st.dataframe(
+            database_rows,
+            use_container_width=True,
+            hide_index=True,
         )
 
 
@@ -461,20 +737,25 @@ st.title(
     "Invoice Processing Multi-Agent System"
 )
 
+st.caption(
+    "Automated invoice classification, extraction, "
+    "purchase-order matching, and manager approval."
+)
+
 
 # ============================================================
 # INCOMING EMAIL
 # ============================================================
 
 email_content = st.text_area(
-    "Incoming Email",
-    height=250,
+    "Incoming Invoice Email",
+    height=300,
     placeholder="Paste invoice email here...",
 )
 
 
 # ============================================================
-# RUN INVOICE WORKFLOW
+# RUN WORKFLOW
 # ============================================================
 
 if st.button(
@@ -485,7 +766,7 @@ if st.button(
     if not email_content.strip():
 
         st.warning(
-            "Please enter an email."
+            "Please enter an invoice email."
         )
 
     else:
@@ -502,24 +783,12 @@ if st.button(
                 }
             )
 
-        # ----------------------------------------------------
-        # Display all task results
-        # ----------------------------------------------------
-
-        display_workflow_results(result)
+        display_workflow_results(
+            result
+        )
 
         # ----------------------------------------------------
-        # Generate approval token for latest PENDING invoice
-        # ----------------------------------------------------
-
-    
-
-        
-                    
-                  
-
-        # ----------------------------------------------------
-        # Database records
+        # Recent Database Records
         # ----------------------------------------------------
 
         rows = get_recent_invoices()
@@ -534,13 +803,14 @@ if st.button(
                 rows,
                 column_config={
                     0: "Invoice ID",
-                    1: "Vendor",
-                    2: "Invoice Number",
+                    1: "Invoice Number",
+                    2: "Vendor",
                     3: "PO Number",
                     4: "Total",
-                    5: "Extraction Status",
-                    6: "Verification Status",
-                    7: "Approval Status",
+                    5: "Currency",
+                    6: "Extraction Status",
+                    7: "Verification Status",
+                    8: "Approval Status",
                 },
                 use_container_width=True,
                 hide_index=True,
@@ -549,7 +819,7 @@ if st.button(
         else:
 
             st.info(
-                "No invoice records found in the database."
+                "No invoice records found."
             )
 
 
@@ -564,10 +834,6 @@ st.header(
 )
 
 
-# ============================================================
-# PENDING INVOICES
-# ============================================================
-
 pending_invoices = get_pending_invoices()
 
 
@@ -577,12 +843,17 @@ if pending_invoices:
         "Pending Invoices"
     )
 
+    # --------------------------------------------------------
+    # IMPORTANT:
+    # Column order now matches the actual SQL SELECT order.
+    # --------------------------------------------------------
+
     st.dataframe(
         pending_invoices,
         column_config={
             0: "Invoice ID",
-            1: "Vendor",
-            2: "Invoice Number",
+            1: "Invoice Number",
+            2: "Vendor",
             3: "PO Number",
             4: "Total",
             5: "Currency",
@@ -593,11 +864,11 @@ if pending_invoices:
     )
 
     # --------------------------------------------------------
-    # Select Invoice
+    # SELECT INVOICE
     # --------------------------------------------------------
 
     invoice_options = {
-        f"Invoice {row[0]} - {row[2]}": row[0]
+        f"{row[1]} — {row[2]}": row[0]
         for row in pending_invoices
     }
 
@@ -613,7 +884,7 @@ if pending_invoices:
     ]
 
     # --------------------------------------------------------
-    # Generate Approval Token
+    # APPROVAL TOKEN
     # --------------------------------------------------------
 
     st.write(
@@ -632,8 +903,8 @@ if pending_invoices:
         if token:
 
             st.success(
-                f"New approval token generated "
-                f"for Invoice ID {selected_invoice_id}."
+                f"Approval token generated for "
+                f"Invoice ID {selected_invoice_id}."
             )
 
             st.code(
@@ -642,8 +913,7 @@ if pending_invoices:
             )
 
             st.info(
-                "Copy this token before approving "
-                "or rejecting the invoice."
+                "Copy this token and enter it below."
             )
 
         else:
@@ -652,10 +922,6 @@ if pending_invoices:
                 "Could not generate approval token."
             )
 
-    # --------------------------------------------------------
-    # Enter Approval Token
-    # --------------------------------------------------------
-
     approval_token = st.text_input(
         "Approval Token",
         type="password",
@@ -663,6 +929,7 @@ if pending_invoices:
     )
 
     col1, col2 = st.columns(2)
+
 
     # ========================================================
     # APPROVE
@@ -694,15 +961,11 @@ if pending_invoices:
                     approval_result = (
                         approval_crew.kickoff(
                             inputs={
-                                "invoice_id": (
-                                    selected_invoice_id
-                                ),
+                                "invoice_id": selected_invoice_id,
                                 "approval_token": (
                                     approval_token.strip()
                                 ),
-                                "approval_status": (
-                                    "APPROVED"
-                                ),
+                                "approval_status": "APPROVED",
                             }
                         )
                     )
@@ -805,7 +1068,6 @@ if pending_invoices:
                         approval_raw
                     )
 
-           
 
     # ========================================================
     # REJECT
@@ -837,15 +1099,11 @@ if pending_invoices:
                     approval_result = (
                         approval_crew.kickoff(
                             inputs={
-                                "invoice_id": (
-                                    selected_invoice_id
-                                ),
+                                "invoice_id": selected_invoice_id,
                                 "approval_token": (
                                     approval_token.strip()
                                 ),
-                                "approval_status": (
-                                    "REJECTED"
-                                ),
+                                "approval_status": "REJECTED",
                             }
                         )
                     )
@@ -948,12 +1206,9 @@ if pending_invoices:
                         approval_raw
                     )
 
-                
-
 else:
 
     st.info(
         "No pending invoices available "
         "for manager approval."
     )
-
