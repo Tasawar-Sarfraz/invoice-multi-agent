@@ -1,4 +1,4 @@
-
+```python
 from crewai import Crew, Process
 
 from agents.agent1_email_classifier import create_email_classifier_agent
@@ -17,7 +17,6 @@ def create_invoice_processing_crew():
     agent1 = create_email_classifier_agent()
     agent2 = create_invoice_extractor_agent()
     agent3 = create_po_matcher_agent()
-    agent4 = create_approval_processor_agent()
 
     task1 = create_email_classification_task(agent1)
 
@@ -26,25 +25,37 @@ def create_invoice_processing_crew():
         task1,
     )
 
-    task3 = create_po_matching_task(agent3)
+    task3 = create_po_matching_task(
+        agent3,
+        task2,
+    )
 
-    task4 = create_approval_task(agent4)
-
-    crew = Crew(
+    return Crew(
         agents=[
             agent1,
             agent2,
             agent3,
-            agent4,
         ],
         tasks=[
             task1,
             task2,
             task3,
-            task4,
         ],
         process=Process.sequential,
         verbose=True,
     )
 
-    return crew
+
+def create_approval_processing_crew():
+
+    agent4 = create_approval_processor_agent()
+
+    task4 = create_approval_task(agent4)
+
+    return Crew(
+        agents=[agent4],
+        tasks=[task4],
+        process=Process.sequential,
+        verbose=True,
+    )
+```
