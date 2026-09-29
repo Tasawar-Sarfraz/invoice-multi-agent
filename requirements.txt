@@ -1,0 +1,6 @@
+crewai
+streamlit
+pandas
+openpyxl
+pydantic
+python-dotenv
