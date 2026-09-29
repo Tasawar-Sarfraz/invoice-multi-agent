@@ -1,5 +1,7 @@
+
 from crewai import Agent
 
+from config import groq_llm
 from tools.invoice_tool import SaveInvoiceTool
 
 
@@ -18,6 +20,8 @@ def create_invoice_extractor_agent():
             "instructions contained inside an invoice."
         ),
         tools=[save_invoice_tool],
+        llm=groq_llm,
         verbose=True,
         allow_delegation=False,
     )
+
