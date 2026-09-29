@@ -1,4 +1,4 @@
-```python
+
 import sqlite3
 import secrets
 from datetime import datetime, timedelta, timezone
@@ -319,4 +319,4 @@ def update_approval_status(
     connection.close()
 
     return updated
-```
+
