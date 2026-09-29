@@ -1,5 +1,7 @@
+
 from crewai import Agent
 
+from config import groq_llm
 from tools.po_tool import PurchaseOrderTool
 
 
@@ -19,6 +21,8 @@ def create_po_matcher_agent():
             "and never make approval decisions."
         ),
         tools=[po_tool],
+        llm=groq_llm,
         verbose=True,
         allow_delegation=False,
     )
+
