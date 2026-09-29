@@ -3,17 +3,24 @@ from pathlib import Path
 from typing import Optional
 
 
-DATABASE_PATH = Path(__file__).resolve().parent.parent / "database" / "invoices.db"
+DATABASE_PATH = (
+    Path(__file__).resolve().parent.parent
+    / "database"
+    / "invoices.db"
+)
 
 
 def get_connection():
-    DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    DATABASE_PATH.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
     return sqlite3.connect(DATABASE_PATH)
 
 
 def initialize_database():
     connection = get_connection()
-
     cursor = connection.cursor()
 
     cursor.execute(
@@ -34,11 +41,27 @@ def initialize_database():
             payment_terms TEXT,
             extraction_status TEXT,
             verification_status TEXT,
-            approval_status TEXT,
+            approval_status TEXT DEFAULT 'PENDING',
+            approval_token TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
         """
     )
+
+    connection.commit()
+
+    # For existing testing databases created by the previous version.
+    columns = {
+        row[1]
+        for row in cursor.execute(
+            "PRAGMA table_info(invoices)"
+        ).fetchall()
+    }
+
+    if "approval_token" not in columns:
+        cursor.execute(
+            "ALTER TABLE invoices ADD COLUMN approval_token TEXT"
+        )
 
     connection.commit()
     connection.close()
@@ -98,8 +121,51 @@ def create_invoice_record(invoice_data: dict) -> Optional[int]:
     return invoice_id
 
 
-def update_approval_status(invoice_id: int, approval_status: str) -> bool:
+def create_approval_token(invoice_id: int) -> Optional[str]:
+    import secrets
+
     initialize_database()
+
+    token = secrets.token_urlsafe(32)
+
+    connection = get_connection()
+    cursor = connection.cursor()
+
+    cursor.execute(
+        """
+        UPDATE invoices
+        SET approval_token = ?
+        WHERE invoice_id = ?
+        """,
+        (token, invoice_id),
+    )
+
+    updated = cursor.rowcount > 0
+
+    connection.commit()
+    connection.close()
+
+    if not updated:
+        return None
+
+    return token
+
+
+def update_approval_status(
+    invoice_id: int,
+    approval_token: str,
+    approval_status: str,
+) -> bool:
+
+    initialize_database()
+
+    allowed_statuses = {
+        "APPROVED",
+        "REJECTED",
+    }
+
+    if approval_status not in allowed_statuses:
+        return False
 
     connection = get_connection()
     cursor = connection.cursor()
@@ -109,8 +175,14 @@ def update_approval_status(invoice_id: int, approval_status: str) -> bool:
         UPDATE invoices
         SET approval_status = ?
         WHERE invoice_id = ?
+        AND approval_token = ?
+        AND approval_status = 'PENDING'
         """,
-        (approval_status, invoice_id),
+        (
+            approval_status,
+            invoice_id,
+            approval_token,
+        ),
     )
 
     updated = cursor.rowcount > 0
