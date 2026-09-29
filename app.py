@@ -646,42 +646,11 @@ if pending_invoices:
     # Generate Approval Token
     # --------------------------------------------------------
 
-    st.write(
-        "### Approval Token"
-    )
+   
 
-    if st.button(
-        "Generate Approval Token",
-        use_container_width=True,
-    ):
+       
 
-        token = create_approval_token(
-            selected_invoice_id
-        )
-
-        if token:
-
-            st.success(
-                f"New approval token generated "
-                f"for Invoice ID {selected_invoice_id}."
-            )
-
-            st.code(
-                token,
-                language="text",
-            )
-
-            st.info(
-                "Copy this token before approving "
-                "or rejecting the invoice."
-            )
-
-        else:
-
-            st.error(
-                "Could not generate approval token."
-            )
-
+           
     # --------------------------------------------------------
     # Enter Approval Token
     # --------------------------------------------------------
