@@ -12,7 +12,8 @@ if not GROQ_API_KEY:
     raise ValueError("GROQ_API_KEY is not configured.")
 
 groq_llm = LLM(
-    model="groq/openai/gpt-oss-120b",
+    model="openai/gpt-oss-120b",
+    custom_openai=True,
+    base_url="https://api.groq.com/openai/v1",
     api_key=GROQ_API_KEY,
 )
-
