@@ -17,3 +17,4 @@ groq_llm = LLM(
     base_url="https://api.groq.com/openai/v1",
     api_key=GROQ_API_KEY,
 )
+print("MODEL CHECK:", groq_llm.model)
