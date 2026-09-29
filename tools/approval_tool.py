@@ -1,4 +1,4 @@
-```python
+
 from crewai.tools import tool
 
 from tools.database_tool import (
@@ -90,4 +90,4 @@ def process_invoice_approval_tool(
         f"SUCCESS: Invoice {invoice_id} "
         f"has been marked as {approval_status}."
     )
-```
+
