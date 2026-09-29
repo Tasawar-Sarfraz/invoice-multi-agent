@@ -1,4 +1,3 @@
-
 import json
 
 from crewai.tools import BaseTool
@@ -10,7 +9,7 @@ class SaveInvoiceTool(BaseTool):
     name: str = "save_invoice_record"
 
     description: str = (
-        "Save the extracted invoice data into the invoice database. "
+        "Save extracted invoice data into the invoice database. "
         "Only invoice workflow fields may be written."
     )
 
@@ -18,19 +17,17 @@ class SaveInvoiceTool(BaseTool):
         try:
             data = json.loads(invoice_data)
 
-            # ------------------------------------------------
-            # Normalize field names from Agent 2 output
-            # ------------------------------------------------
+            # Agent 2 may return the actual invoice fields
+            # inside the extracted_data object.
+            if isinstance(data.get("extracted_data"), dict):
+                data = data["extracted_data"]
 
+            # Normalize field names
             if "vendor" in data and "vendor_name" not in data:
                 data["vendor_name"] = data["vendor"]
 
             if "po_number" in data and "PO_number" not in data:
                 data["PO_number"] = data["po_number"]
-
-            # ------------------------------------------------
-            # Required invoice fields
-            # ------------------------------------------------
 
             required_fields = [
                 "vendor_name",
@@ -51,10 +48,6 @@ class SaveInvoiceTool(BaseTool):
             for field in required_fields:
                 if field not in data:
                     data[field] = "UNKNOWN"
-
-            # ------------------------------------------------
-            # Save invoice
-            # ------------------------------------------------
 
             invoice_id = create_invoice_record(data)
 
@@ -91,4 +84,3 @@ class SaveInvoiceTool(BaseTool):
                     "reason": str(error),
                 }
             )
-
