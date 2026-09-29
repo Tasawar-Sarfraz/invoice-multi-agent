@@ -22,15 +22,16 @@ def create_invoice_extraction_task(agent, classification_task):
 
         Return:
 
-        {
+        {{
             "invoice_record_id": "...",
             "extraction_status": "SUCCESS|INVALID_DATA|NEEDS_REVIEW",
-            "extracted_data": {},
+            "extracted_data": {{}},
             "uncertain_fields": [],
             "security_flags": []
-        }
+        }}
         """,
         expected_output="Structured invoice extraction result.",
         agent=agent,
         context=[classification_task],
     )
+
