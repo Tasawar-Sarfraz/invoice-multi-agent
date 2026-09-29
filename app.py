@@ -1,4 +1,4 @@
-```python
+
 import sqlite3
 from pathlib import Path
 
@@ -90,12 +90,7 @@ if st.button("Run Invoice Workflow"):
             )
         else:
             st.info("No invoice records found in the database.")
-```
 
-[/writing]
 
-Ab **sirf ye `app.py` GitHub par push** karo.
-
-Phir Streamlit Cloud par same invoice run karo.
 
 Humein `Database Records` mein dekhna hai ke **Agent 2 ne actual database record create kiya ya nahi**.
