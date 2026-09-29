@@ -1,4 +1,3 @@
-
 import json
 import sqlite3
 from pathlib import Path
@@ -99,7 +98,21 @@ def get_pending_invoices():
 
     connection.close()
 
-    return rows
+    # Convert database rows into dictionaries.
+    # This guarantees that each value stays under
+    # its correct column name.
+    return [
+        {
+            "Invoice ID": row[0],
+            "Invoice Number": row[1],
+            "Vendor": row[2],
+            "PO Number": row[3],
+            "Total": row[4],
+            "Currency": row[5],
+            "Approval Status": row[6],
+        }
+        for row in rows
+    ]
 
 
 def get_recent_invoices():
@@ -126,7 +139,23 @@ def get_recent_invoices():
 
     connection.close()
 
-    return rows
+    # Convert database rows into dictionaries.
+    # Column names are now directly connected
+    # to the correct database values.
+    return [
+        {
+            "Invoice ID": row[0],
+            "Invoice Number": row[1],
+            "Vendor": row[2],
+            "PO Number": row[3],
+            "Total": row[4],
+            "Currency": row[5],
+            "Extraction Status": row[6],
+            "Verification Status": row[7],
+            "Approval Status": row[8],
+        }
+        for row in rows
+    ]
 
 
 # ============================================================
@@ -158,6 +187,7 @@ def extract_task_results(crew_result):
             continue
 
         try:
+
             data = json.loads(raw)
 
             if isinstance(data, dict):
@@ -413,6 +443,7 @@ def display_workflow_results(crew_result):
                 hide_index=True,
             )
 
+
             # ------------------------------------------------
             # Invoice Items
             # ------------------------------------------------
@@ -462,6 +493,7 @@ def display_workflow_results(crew_result):
                     hide_index=True,
                 )
 
+
         uncertain_fields = extraction_result.get(
             "uncertain_fields",
             [],
@@ -476,6 +508,7 @@ def display_workflow_results(crew_result):
             st.json(
                 uncertain_fields
             )
+
 
         security_flags = extraction_result.get(
             "security_flags",
@@ -543,6 +576,11 @@ def display_workflow_results(crew_result):
             [],
         )
 
+
+        # ----------------------------------------------------
+        # Matching status
+        # ----------------------------------------------------
+
         if status == "MATCH":
 
             st.success(
@@ -564,6 +602,11 @@ def display_workflow_results(crew_result):
                 f"PO Matching Status: {status}"
             )
 
+
+        # ----------------------------------------------------
+        # Invoice / PO IDs
+        # ----------------------------------------------------
+
         col1, col2 = st.columns(2)
 
         with col1:
@@ -577,6 +620,11 @@ def display_workflow_results(crew_result):
             st.write(
                 f"**PO ID:** {po_id}"
             )
+
+
+        # ----------------------------------------------------
+        # Comparison
+        # ----------------------------------------------------
 
         if comparison:
 
@@ -604,6 +652,11 @@ def display_workflow_results(crew_result):
                 hide_index=True,
             )
 
+
+        # ----------------------------------------------------
+        # Mismatches
+        # ----------------------------------------------------
+
         if mismatches:
 
             st.write(
@@ -620,11 +673,21 @@ def display_workflow_results(crew_result):
                 "**Mismatches:** None"
             )
 
+
+        # ----------------------------------------------------
+        # Reason
+        # ----------------------------------------------------
+
         if reason:
 
             st.write(
                 f"**Reason:** {reason}"
             )
+
+
+        # ----------------------------------------------------
+        # Security flags
+        # ----------------------------------------------------
 
         if security_flags:
 
@@ -787,6 +850,7 @@ if st.button(
             result
         )
 
+
         # ----------------------------------------------------
         # Recent Database Records
         # ----------------------------------------------------
@@ -801,17 +865,6 @@ if st.button(
 
             st.dataframe(
                 rows,
-                column_config={
-                    0: "Invoice ID",
-                    1: "Invoice Number",
-                    2: "Vendor",
-                    3: "PO Number",
-                    4: "Total",
-                    5: "Currency",
-                    6: "Extraction Status",
-                    7: "Verification Status",
-                    8: "Approval Status",
-                },
                 use_container_width=True,
                 hide_index=True,
             )
@@ -843,32 +896,25 @@ if pending_invoices:
         "Pending Invoices"
     )
 
+
     # --------------------------------------------------------
-    # IMPORTANT:
-    # Column order now matches the actual SQL SELECT order.
+    # Pending invoices table
     # --------------------------------------------------------
 
     st.dataframe(
         pending_invoices,
-        column_config={
-            0: "Invoice ID",
-            1: "Invoice Number",
-            2: "Vendor",
-            3: "PO Number",
-            4: "Total",
-            5: "Currency",
-            6: "Approval Status",
-        },
         use_container_width=True,
         hide_index=True,
     )
 
+
     # --------------------------------------------------------
-    # SELECT INVOICE
+    # Select Invoice
     # --------------------------------------------------------
 
     invoice_options = {
-        f"{row[1]} — {row[2]}": row[0]
+        f"{row['Invoice Number']} — {row['Vendor']}":
+        row["Invoice ID"]
         for row in pending_invoices
     }
 
@@ -883,13 +929,15 @@ if pending_invoices:
         selected_invoice
     ]
 
-    # --------------------------------------------------------
+
+    # ========================================================
     # APPROVAL TOKEN
-    # --------------------------------------------------------
+    # ========================================================
 
     st.write(
         "### Approval Token"
     )
+
 
     if st.button(
         "Generate Approval Token",
@@ -922,11 +970,13 @@ if pending_invoices:
                 "Could not generate approval token."
             )
 
+
     approval_token = st.text_input(
         "Approval Token",
         type="password",
         placeholder="Enter approval token...",
     )
+
 
     col1, col2 = st.columns(2)
 
@@ -970,15 +1020,18 @@ if pending_invoices:
                         )
                     )
 
+
                 approval_raw = getattr(
                     approval_result,
                     "raw",
                     "",
                 )
 
+
                 st.subheader(
                     "Approval Result"
                 )
+
 
                 try:
 
@@ -993,6 +1046,7 @@ if pending_invoices:
 
                     approval_data = None
 
+
                 if approval_data:
 
                     database_update = (
@@ -1001,6 +1055,7 @@ if pending_invoices:
                             "UNKNOWN",
                         )
                     )
+
 
                     if database_update == "SUCCESS":
 
@@ -1019,6 +1074,7 @@ if pending_invoices:
                         st.warning(
                             "Approval processing failed."
                         )
+
 
                     st.write(
                         f"**Invoice ID:** "
@@ -1040,6 +1096,7 @@ if pending_invoices:
                         f"{approval_data.get('reason', '')}"
                     )
 
+
                     security_flags = (
                         approval_data.get(
                             "security_flags",
@@ -1056,6 +1113,7 @@ if pending_invoices:
                         st.json(
                             security_flags
                         )
+
 
                 else:
 
@@ -1108,15 +1166,18 @@ if pending_invoices:
                         )
                     )
 
+
                 approval_raw = getattr(
                     approval_result,
                     "raw",
                     "",
                 )
 
+
                 st.subheader(
                     "Approval Result"
                 )
+
 
                 try:
 
@@ -1131,6 +1192,7 @@ if pending_invoices:
 
                     approval_data = None
 
+
                 if approval_data:
 
                     database_update = (
@@ -1139,6 +1201,7 @@ if pending_invoices:
                             "UNKNOWN",
                         )
                     )
+
 
                     if database_update == "SUCCESS":
 
@@ -1157,6 +1220,7 @@ if pending_invoices:
                         st.warning(
                             "Rejection processing failed."
                         )
+
 
                     st.write(
                         f"**Invoice ID:** "
@@ -1178,6 +1242,7 @@ if pending_invoices:
                         f"{approval_data.get('reason', '')}"
                     )
 
+
                     security_flags = (
                         approval_data.get(
                             "security_flags",
@@ -1195,6 +1260,7 @@ if pending_invoices:
                             security_flags
                         )
 
+
                 else:
 
                     st.warning(
@@ -1205,6 +1271,7 @@ if pending_invoices:
                     st.write(
                         approval_raw
                     )
+
 
 else:
 
