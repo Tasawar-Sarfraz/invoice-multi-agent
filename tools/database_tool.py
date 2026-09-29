@@ -305,11 +305,13 @@ def update_approval_status(
             approval_token = NULL,
             approval_token_expires_at = NULL
         WHERE invoice_id = ?
+        AND approval_token = ?
         AND approval_status = 'PENDING'
         """,
         (
             approval_status,
             invoice_id,
+            approval_token,
         ),
     )
 
