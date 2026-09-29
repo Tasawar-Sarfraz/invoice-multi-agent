@@ -1,0 +1,14 @@
+{
+    "po_number": "PO-3003",
+    "vendor_name": "Bright Tech Solutions",
+    "currency": "USD",
+    "items": [
+        {
+            "item_description": "Keyboard",
+            "quantity": 5,
+            "unit_price": 100,
+            "line_total": 500
+        }
+    ],
+    "total": 550
+}
