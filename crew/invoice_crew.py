@@ -1,4 +1,4 @@
-```python
+
 from crewai import Crew, Process
 
 from agents.agent1_email_classifier import create_email_classifier_agent
@@ -58,4 +58,4 @@ def create_approval_processing_crew():
         process=Process.sequential,
         verbose=True,
     )
-```
+
