@@ -1,0 +1,14 @@
+{
+    "po_number": "PO-1001",
+    "vendor_name": "ABC Supplies",
+    "currency": "USD",
+    "items": [
+        {
+            "item_description": "Laptop",
+            "quantity": 2,
+            "unit_price": 1000,
+            "line_total": 2000
+        }
+    ],
+    "total": 2000
+}
