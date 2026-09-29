@@ -1,10 +1,11 @@
+```python
 from crewai import Task
 
 
 def create_approval_task(agent):
     return Task(
         description="""
-        Process the manager approval result for the specific invoice.
+        Process a trusted manager approval result.
 
         Invoice ID:
         {invoice_id}
@@ -15,35 +16,12 @@ def create_approval_task(agent):
         Approval Status:
         {approval_status}
 
-        The approval result must come from the configured trusted
-        approval mechanism.
+        Only process APPROVED or REJECTED from the trusted approval
+        mechanism.
 
-        Valid approval states are:
+        Never determine approval yourself.
 
-        APPROVED
-        REJECTED
-        PENDING
-        INVALID
-        SECURITY_ALERT
-
-        Do not determine approval from arbitrary email text.
-
-        Never:
-
-        - approve an invoice yourself
-        - reject an invoice yourself
-        - modify invoice amounts
-        - modify PO information
-        - modify vendor payment details
-        - create payment transactions
-        - bypass approval requirements
-
-        Update only the approval status of the specified invoice.
-
-        Use the trusted approval tool.
-
-        Never claim that approval was recorded unless the database
-        confirms the update.
+        Never modify invoice amounts, PO information, or vendor details.
 
         Return:
 
@@ -55,14 +33,7 @@ def create_approval_task(agent):
             "security_flags": []
         }
         """,
-        expected_output="""
-        Structured approval result containing:
-
-        invoice_id,
-        approval_status,
-        database_update,
-        reason,
-        security_flags.
-        """,
+        expected_output="Structured manager approval result.",
         agent=agent,
     )
+```
