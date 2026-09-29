@@ -27,6 +27,8 @@
 
 from crewai import Agent
 
+from config import groq_llm
+
 from tools.approval_tool import (
     validate_approval_token_tool,
     process_invoice_approval_tool,
@@ -46,10 +48,14 @@ def create_approval_processor_agent():
             "or rejected. You only process a trusted manager decision "
             "after validating the approval token."
         ),
+        llm=groq_llm,
         tools=[
             validate_approval_token_tool,
             process_invoice_approval_tool,
         ],
         verbose=True,
+        allow_delegation=False,
     )
+
+
 
