@@ -1,3 +1,4 @@
+
 import json
 
 from crewai.tools import BaseTool
@@ -7,6 +8,7 @@ from tools.database_tool import create_invoice_record
 
 class SaveInvoiceTool(BaseTool):
     name: str = "save_invoice_record"
+
     description: str = (
         "Save the extracted invoice data into the invoice database. "
         "Only invoice workflow fields may be written."
@@ -15,6 +17,20 @@ class SaveInvoiceTool(BaseTool):
     def _run(self, invoice_data: str) -> str:
         try:
             data = json.loads(invoice_data)
+
+            # ------------------------------------------------
+            # Normalize field names from Agent 2 output
+            # ------------------------------------------------
+
+            if "vendor" in data and "vendor_name" not in data:
+                data["vendor_name"] = data["vendor"]
+
+            if "po_number" in data and "PO_number" not in data:
+                data["PO_number"] = data["po_number"]
+
+            # ------------------------------------------------
+            # Required invoice fields
+            # ------------------------------------------------
 
             required_fields = [
                 "vendor_name",
@@ -36,13 +52,20 @@ class SaveInvoiceTool(BaseTool):
                 if field not in data:
                     data[field] = "UNKNOWN"
 
+            # ------------------------------------------------
+            # Save invoice
+            # ------------------------------------------------
+
             invoice_id = create_invoice_record(data)
 
             if invoice_id is None:
                 return json.dumps(
                     {
                         "status": "FAILED",
-                        "reason": "Database did not confirm the invoice record.",
+                        "reason": (
+                            "Database did not confirm "
+                            "the invoice record."
+                        ),
                     }
                 )
 
@@ -53,6 +76,14 @@ class SaveInvoiceTool(BaseTool):
                 }
             )
 
+        except json.JSONDecodeError:
+            return json.dumps(
+                {
+                    "status": "FAILED",
+                    "reason": "Invalid JSON invoice data.",
+                }
+            )
+
         except Exception as error:
             return json.dumps(
                 {
@@ -60,3 +91,4 @@ class SaveInvoiceTool(BaseTool):
                     "reason": str(error),
                 }
             )
+
