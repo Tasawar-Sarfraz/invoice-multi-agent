@@ -5,6 +5,7 @@ from tools.database_tool import initialize_database
 from crew.invoice_crew import (
     create_invoice_classification_crew,
     create_invoice_extraction_crew,
+    create_po_matching_crew,
 )
 
 
@@ -64,4 +65,30 @@ if st.button("Run Agent 2"):
         )
 
         st.subheader("Agent 2 Result")
+        st.write(result)
+
+
+st.divider()
+
+
+invoice_data = st.text_area(
+    "Invoice Data for PO Matching",
+    height=300,
+    placeholder="Enter extracted invoice JSON here...",
+)
+
+if st.button("Run Agent 3"):
+
+    if not invoice_data.strip():
+        st.warning("Please enter invoice data.")
+    else:
+        crew = create_po_matching_crew()
+
+        result = crew.kickoff(
+            inputs={
+                "invoice_data": invoice_data
+            }
+        )
+
+        st.subheader("Agent 3 Result")
         st.write(result)
