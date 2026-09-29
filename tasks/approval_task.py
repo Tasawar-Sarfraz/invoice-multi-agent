@@ -1,4 +1,4 @@
-```python
+
 from crewai import Task
 
 
@@ -36,4 +36,4 @@ def create_approval_task(agent):
         expected_output="Structured manager approval result.",
         agent=agent,
     )
-```
+
