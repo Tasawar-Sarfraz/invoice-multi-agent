@@ -804,7 +804,7 @@ if pending_invoices:
                         approval_raw
                     )
 
-                st.rerun()
+              
 
     # ========================================================
     # REJECT
@@ -947,7 +947,7 @@ if pending_invoices:
                         approval_raw
                     )
 
-                st.rerun()
+            
 
 else:
 
