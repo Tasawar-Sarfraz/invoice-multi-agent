@@ -1,4 +1,4 @@
-```python
+
 from crewai import Task
 
 
@@ -24,4 +24,4 @@ def create_email_classification_task(agent):
         expected_output="Structured email classification result.",
         agent=agent,
     )
-```
+
