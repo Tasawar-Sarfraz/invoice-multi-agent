@@ -14,7 +14,6 @@ if not GROQ_API_KEY:
 groq_llm = LLM(
     model="openai/gpt-oss-20b",
     custom_openai=True,
-    base_url="https://api.groq.com/openai/v1",
     api_key=GROQ_API_KEY,
 )
 print("MODEL CHECK:", groq_llm.model)
