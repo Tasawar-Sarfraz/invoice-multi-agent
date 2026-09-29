@@ -1,4 +1,4 @@
-```python
+
 import streamlit as st
 
 from tools.database_tool import initialize_database
@@ -34,4 +34,4 @@ if st.button("Run Invoice Workflow"):
 
         st.subheader("Workflow Result")
         st.write(result)
-```
+
