@@ -1,3 +1,4 @@
+
 crewai
 crewai[groq]
 streamlit
@@ -5,3 +6,5 @@ pandas
 openpyxl
 pydantic
 python-dotenv
+groq
+
