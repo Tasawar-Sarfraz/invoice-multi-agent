@@ -1,0 +1,20 @@
+{
+    "po_number": "PO-4005",
+    "vendor_name": "TechNova Solutions",
+    "currency": "USD",
+    "items": [
+        {
+            "item_description": "Keyboard",
+            "quantity": 10,
+            "unit_price": 40,
+            "subtotal": 400
+        },
+        {
+            "item_description": "Mouse",
+            "quantity": 10,
+            "unit_price": 25,
+            "subtotal": 250
+        }
+    ],
+    "total": 650
+}
