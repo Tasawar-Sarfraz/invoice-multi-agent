@@ -76,27 +76,27 @@ database_path = (
 #     return row
 
 
-# def get_pending_invoices():
-#     connection = sqlite3.connect(database_path)
-#     cursor = connection.cursor()
+def get_pending_invoices():
+    connection = sqlite3.connect(database_path)
+    cursor = connection.cursor()
 
-#     rows = cursor.execute(
-#         """
-#         SELECT
-#             invoice_id,
-#             invoice_number,
-#             vendor_name,
-#             po_number,
-#             total,
-#             currency,
-#             approval_status
-#         FROM invoices
-#         WHERE approval_status = 'PENDING'
-#         ORDER BY invoice_id DESC
-#         """
-#     ).fetchall()
+    rows = cursor.execute(
+        """
+        SELECT
+            invoice_id,
+            invoice_number,
+            vendor_name,
+            po_number,
+            total,
+            currency,
+            approval_status
+        FROM invoices
+        WHERE approval_status = 'PENDING'
+        ORDER BY invoice_id DESC
+        """
+    ).fetchall()
 
-#     connection.close()
+    connection.close()
 
     # Convert database rows into dictionaries.
     # This guarantees that each value stays under
