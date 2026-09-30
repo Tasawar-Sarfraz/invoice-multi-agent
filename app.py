@@ -1,4 +1,3 @@
-
 import json
 import sqlite3
 from pathlib import Path
@@ -76,6 +75,61 @@ def get_latest_invoice():
     connection.close()
 
     return row
+
+
+def get_invoice_id_from_reference(invoice_reference):
+    """
+    Resolve Agent 3's invoice reference to the numeric
+    database invoice_id.
+
+    Agent 3 may return either:
+        2
+    or:
+        INV-4005
+    """
+
+    if invoice_reference in {
+        None,
+        "",
+        "UNKNOWN",
+    }:
+        return None
+
+    # --------------------------------------------------------
+    # Case 1: Agent 3 returned numeric database invoice_id
+    # --------------------------------------------------------
+
+    try:
+        return int(invoice_reference)
+
+    except (ValueError, TypeError):
+        pass
+
+    # --------------------------------------------------------
+    # Case 2: Agent 3 returned invoice number
+    # Example: INV-4005
+    # --------------------------------------------------------
+
+    connection = sqlite3.connect(database_path)
+    cursor = connection.cursor()
+
+    row = cursor.execute(
+        """
+        SELECT invoice_id
+        FROM invoices
+        WHERE invoice_number = ?
+        ORDER BY invoice_id DESC
+        LIMIT 1
+        """,
+        (str(invoice_reference).strip(),),
+    ).fetchone()
+
+    connection.close()
+
+    if row:
+        return row[0]
+
+    return None
 
 
 def get_pending_invoices():
@@ -978,6 +1032,11 @@ if st.button(
         # MATCH  -> VERIFIED
         # Others -> FAILED
         #
+        # Agent 3 may return either:
+        #   numeric database ID
+        # or:
+        #   invoice number such as INV-4005
+        #
         # ====================================================
 
         task_results = extract_task_results(
@@ -991,7 +1050,7 @@ if st.button(
 
         if matching_result:
 
-            verification_invoice_id = (
+            verification_invoice_reference = (
                 matching_result.get(
                     "invoice_id"
                 )
@@ -1003,11 +1062,13 @@ if st.button(
                 )
             )
 
-            if verification_invoice_id not in {
-                None,
-                "",
-                "UNKNOWN",
-            }:
+            database_invoice_id = (
+                get_invoice_id_from_reference(
+                    verification_invoice_reference
+                )
+            )
+
+            if database_invoice_id is not None:
 
                 if matching_status == "MATCH":
 
@@ -1017,16 +1078,18 @@ if st.button(
 
                     verification_status = "FAILED"
 
-                if verification_invoice_id not in {None, "", "UNKNOWN"}:
-    if matching_status == "MATCH":
-        verification_status = "VERIFIED"
-    else:
-        verification_status = "FAILED"
+                update_verification_status(
+                    database_invoice_id,
+                    verification_status,
+                )
 
-    update_verification_status(
-        int(verification_invoice_id),
-        verification_status,
-    )
+            else:
+
+                st.warning(
+                    "Could not resolve Agent 3 invoice reference "
+                    f"'{verification_invoice_reference}' "
+                    "to a database invoice ID."
+                )
 
         display_workflow_results(
             result
@@ -1472,4 +1535,3 @@ else:
     st.info(
         "No invoices available."
     )
-
