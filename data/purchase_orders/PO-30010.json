@@ -1,0 +1,14 @@
+{
+    "po_number": "PO-30010",
+    "vendor_name": "Right Tech Solutions",
+    "currency": "USD",
+    "items": [
+        {
+            "item_description": "laptop",
+            "quantity": 10,
+            "unit_price": 150,
+            "line_total": 150
+        }
+    ],
+    "total": 550
+}
