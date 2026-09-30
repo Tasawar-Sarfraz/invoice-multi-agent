@@ -1017,12 +1017,16 @@ if st.button(
 
                     verification_status = "FAILED"
 
-                update_verification_status(
-                    int(
-                        verification_invoice_id
-                    ),
-                    verification_status,
-                )
+                if verification_invoice_id not in {None, "", "UNKNOWN"}:
+    if matching_status == "MATCH":
+        verification_status = "VERIFIED"
+    else:
+        verification_status = "FAILED"
+
+    update_verification_status(
+        int(verification_invoice_id),
+        verification_status,
+    )
 
         display_workflow_results(
             result
