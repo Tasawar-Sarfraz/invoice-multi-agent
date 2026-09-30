@@ -309,3 +309,23 @@ Aur database update ho jata hai.
               ┌────────┴────────┐
               ↓                 ↓
            APPROVED           REJECTED
+
+           Agent 4 ka role
+
+Agent 4 ko ye 3 cheezen milni hain:
+
+Invoice ID — 15
+Approval Token
+Manager Decision — APPROVED ya REJECTED
+
+Phir Agent 4:
+
+Token validate karega.
+Manager decision verify karega.
+SQLite database mein invoice status update karega.
+Final result return karega.
+
+Expected database states:
+
+APPROVED
+REJECTED
