@@ -401,3 +401,124 @@ def process_approval(
     finally:
         connection.close()
 
+def validate_approval_token(
+    invoice_id: int,
+    approval_token: str,
+) -> dict:
+    """
+    Validate an approval token without changing invoice status.
+
+    Returns:
+        {
+            "valid": True/False,
+            "reason": "...",
+            "security_flags": [...]
+        }
+    """
+
+    initialize_database()
+
+    connection = get_connection()
+    cursor = connection.cursor()
+
+    try:
+        cursor.execute(
+            """
+            SELECT
+                approval_status,
+                approval_token,
+                approval_token_expires_at
+            FROM invoices
+            WHERE invoice_id = ?
+            """,
+            (invoice_id,),
+        )
+
+        row = cursor.fetchone()
+
+        if row is None:
+            return {
+                "valid": False,
+                "reason": "Invoice not found.",
+                "security_flags": [
+                    "INVOICE_NOT_FOUND"
+                ],
+            }
+
+        (
+            approval_status,
+            stored_token,
+            expires_at,
+        ) = row
+
+        if approval_status != "PENDING":
+            return {
+                "valid": False,
+                "reason": (
+                    "Invoice has already been processed."
+                ),
+                "security_flags": [
+                    "DUPLICATE_PROCESSING"
+                ],
+            }
+
+        if not stored_token or approval_token != stored_token:
+            return {
+                "valid": False,
+                "reason": "Invalid approval token.",
+                "security_flags": [
+                    "INVALID_TOKEN"
+                ],
+            }
+
+        if not expires_at:
+            return {
+                "valid": False,
+                "reason": (
+                    "Approval token has no expiry."
+                ),
+                "security_flags": [
+                    "INVALID_TOKEN_EXPIRY"
+                ],
+            }
+
+        try:
+            expiry_datetime = datetime.fromisoformat(
+                expires_at
+            )
+
+            if expiry_datetime.tzinfo is None:
+                expiry_datetime = expiry_datetime.replace(
+                    tzinfo=timezone.utc
+                )
+
+        except ValueError:
+            return {
+                "valid": False,
+                "reason": (
+                    "Invalid approval token expiry."
+                ),
+                "security_flags": [
+                    "INVALID_TOKEN_EXPIRY"
+                ],
+            }
+
+        if datetime.now(timezone.utc) >= expiry_datetime:
+            return {
+                "valid": False,
+                "reason": (
+                    "Approval token has expired."
+                ),
+                "security_flags": [
+                    "EXPIRED_TOKEN"
+                ],
+            }
+
+        return {
+            "valid": True,
+            "reason": "Approval token is valid.",
+            "security_flags": [],
+        }
+
+    finally:
+        connection.close()
