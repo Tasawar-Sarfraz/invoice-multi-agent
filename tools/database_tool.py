@@ -1,4 +1,5 @@
 
+import json
 import sqlite3
 import secrets
 from datetime import datetime, timedelta, timezone
@@ -110,7 +111,7 @@ def create_invoice_record(invoice_data: dict) -> Optional[int]:
             invoice_data.get("due_date", "UNKNOWN"),
             invoice_data.get("currency", "UNKNOWN"),
             invoice_data.get("PO_number", "UNKNOWN"),
-            str(invoice_data.get("items", [])),
+            json.dumps(invoice_data.get("items", [])),
             invoice_data.get("subtotal", "UNKNOWN"),
             invoice_data.get("tax", "UNKNOWN"),
             invoice_data.get("shipping", "UNKNOWN"),
