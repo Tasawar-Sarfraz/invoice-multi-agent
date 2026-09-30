@@ -1,3 +1,4 @@
+
 from crewai import Task
 
 
@@ -39,10 +40,56 @@ def create_po_matching_task(agent, extraction_task):
         - Items
         - Quantity
         - Unit price
-        - Total
+        - Invoice subtotal against PO total
         - Currency
 
+        IMPORTANT TOTAL MATCHING RULE:
+
+        Compare the invoice "subtotal" with the Purchase Order "total".
+
+        Do NOT compare the invoice final "total" with the PO "total".
+
+        The invoice final total may include:
+        - Tax
+        - Shipping
+        - Other additional charges
+
+        These additional charges are not necessarily part of the Purchase Order total.
+
+        Therefore, if:
+
+        invoice subtotal = PO total
+
+        then the amount comparison is a MATCH, even if:
+
+        invoice total != PO total
+
+        Example:
+
+        Invoice:
+        subtotal = 650
+        tax = 65
+        shipping = 20
+        total = 735
+
+        PO:
+        total = 650
+
+        The amount comparison MUST be considered a MATCH because:
+
+        invoice subtotal = PO total = 650
+
+        Tax and shipping must not be treated as a PO amount mismatch.
+
+        Compare invoice line items individually with PO line items:
+
+        - Item description
+        - Quantity
+        - Unit price
+        - Subtotal
+
         Never modify invoice or PO data.
+
         Never approve or reject the invoice.
 
         Valid results:
@@ -78,3 +125,4 @@ def create_po_matching_task(agent, extraction_task):
         agent=agent,
         context=[extraction_task],
     )
+
