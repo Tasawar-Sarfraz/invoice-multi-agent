@@ -243,7 +243,163 @@ def create_approval_token(
         return None
 
     return token
+def update_approval_status(
+    invoice_id: int,
+    approval_token: str,
+    approval_status: str,
+) -> dict:
+    """
+    Update approval status after validating the approval token.
 
+    This operation is atomic and only allows a pending invoice
+    with the exact valid token to be processed.
+    """
+
+    initialize_database()
+
+    approval_status = approval_status.strip().upper()
+
+    if approval_status not in {
+        "APPROVED",
+        "REJECTED",
+    }:
+        return {
+            "status": "FAILED",
+            "reason": "Invalid approval status.",
+            "security_flags": [],
+        }
+
+    connection = get_connection()
+    cursor = connection.cursor()
+
+    try:
+        cursor.execute(
+            """
+            SELECT
+                approval_status,
+                approval_token,
+                approval_token_expires_at
+            FROM invoices
+            WHERE invoice_id = ?
+            """,
+            (invoice_id,),
+        )
+
+        row = cursor.fetchone()
+
+        if row is None:
+            return {
+                "status": "FAILED",
+                "reason": "Invoice not found.",
+                "security_flags": [
+                    "INVOICE_NOT_FOUND"
+                ],
+            }
+
+        (
+            current_status,
+            stored_token,
+            expires_at,
+        ) = row
+
+        if current_status != "PENDING":
+            return {
+                "status": "NOT_PERMITTED",
+                "reason": (
+                    "Invoice has already been processed."
+                ),
+                "security_flags": [
+                    "DUPLICATE_PROCESSING"
+                ],
+            }
+
+        if not stored_token or approval_token != stored_token:
+            return {
+                "status": "FAILED",
+                "reason": "Invalid approval token.",
+                "security_flags": [
+                    "INVALID_TOKEN"
+                ],
+            }
+
+        if not expires_at:
+            return {
+                "status": "FAILED",
+                "reason": "Approval token has no expiry.",
+                "security_flags": [
+                    "INVALID_TOKEN_EXPIRY"
+                ],
+            }
+
+        try:
+            expiry_datetime = datetime.fromisoformat(
+                expires_at
+            )
+
+            if expiry_datetime.tzinfo is None:
+                expiry_datetime = expiry_datetime.replace(
+                    tzinfo=timezone.utc
+                )
+
+        except ValueError:
+            return {
+                "status": "FAILED",
+                "reason": "Invalid approval token expiry.",
+                "security_flags": [
+                    "INVALID_TOKEN_EXPIRY"
+                ],
+            }
+
+        if datetime.now(timezone.utc) >= expiry_datetime:
+            return {
+                "status": "FAILED",
+                "reason": "Approval token has expired.",
+                "security_flags": [
+                    "EXPIRED_TOKEN"
+                ],
+            }
+
+        cursor.execute(
+            """
+            UPDATE invoices
+            SET approval_status = ?,
+                approval_token = NULL,
+                approval_token_expires_at = NULL
+            WHERE invoice_id = ?
+              AND approval_status = 'PENDING'
+              AND approval_token = ?
+            """,
+            (
+                approval_status,
+                invoice_id,
+                approval_token,
+            ),
+        )
+
+        if cursor.rowcount != 1:
+            connection.rollback()
+
+            return {
+                "status": "NOT_PERMITTED",
+                "reason": (
+                    "Invoice has already been processed."
+                ),
+                "security_flags": [
+                    "DUPLICATE_PROCESSING"
+                ],
+            }
+
+        connection.commit()
+
+        return {
+            "status": "SUCCESS",
+            "invoice_id": str(invoice_id),
+            "approval_status": approval_status,
+            "security_flags": [],
+        }
+
+    finally:
+        connection.close()
 
 def process_approval(
     invoice_id: int,
