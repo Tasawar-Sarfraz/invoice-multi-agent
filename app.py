@@ -42,38 +42,38 @@ database_path = (
 # DATABASE HELPERS
 # ============================================================
 
-# def get_latest_invoice():
-#     connection = sqlite3.connect(database_path)
-#     cursor = connection.cursor()
+def get_latest_invoice():
+    connection = sqlite3.connect(database_path)
+    cursor = connection.cursor()
 
-#     row = cursor.execute(
-#         """
-#         SELECT
-#             invoice_id,
-#             vendor_name,
-#             invoice_number,
-#             invoice_date,
-#             due_date,
-#             currency,
-#             po_number,
-#             items,
-#             subtotal,
-#             tax,
-#             shipping,
-#             total,
-#             payment_terms,
-#             extraction_status,
-#             verification_status,
-#             approval_status
-#         FROM invoices
-#         ORDER BY invoice_id DESC
-#         LIMIT 1
-#         """
-#     ).fetchone()
+    row = cursor.execute(
+        """
+        SELECT
+            invoice_id,
+            vendor_name,
+            invoice_number,
+            invoice_date,
+            due_date,
+            currency,
+            po_number,
+            items,
+            subtotal,
+            tax,
+            shipping,
+            total,
+            payment_terms,
+            extraction_status,
+            verification_status,
+            approval_status
+        FROM invoices
+        ORDER BY invoice_id DESC
+        LIMIT 1
+        """
+    ).fetchone()
 
-#     connection.close()
+    connection.close()
 
-#     return row
+    return row
 
 
 def get_pending_invoices():
