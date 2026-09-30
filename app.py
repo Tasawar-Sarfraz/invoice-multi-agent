@@ -197,6 +197,98 @@ def get_approval_invoices():
 
 
 # ============================================================
+# ITEM HELPERS
+# ============================================================
+
+def normalize_items(items):
+    """
+    Normalize invoice items so the UI can handle the expected
+    list-of-dictionaries structure.
+
+    Expected structure:
+
+    [
+        {
+            "item_description": "Mouse",
+            "quantity": 20,
+            "unit_price": 50,
+            "subtotal": 1000
+        }
+    ]
+    """
+
+    if not items:
+        return []
+
+    # If items is stored as JSON text in the database
+    if isinstance(items, str):
+        try:
+            items = json.loads(items)
+        except (json.JSONDecodeError, TypeError):
+            return []
+
+    # Make sure items is a list
+    if not isinstance(items, list):
+        return []
+
+    normalized_rows = []
+
+    for item in items:
+
+        # Handle dictionary-based item structure
+        if isinstance(item, dict):
+
+            item_description = (
+                item.get("item_description")
+                or item.get("description")
+                or item.get("item")
+                or item.get("name")
+                or "UNKNOWN"
+            )
+
+            quantity = item.get(
+                "quantity",
+                "UNKNOWN",
+            )
+
+            unit_price = item.get(
+                "unit_price",
+                "UNKNOWN",
+            )
+
+            line_total = item.get(
+                "line_total",
+                item.get(
+                    "subtotal",
+                    "UNKNOWN",
+                ),
+            )
+
+            normalized_rows.append(
+                {
+                    "Item": item_description,
+                    "Quantity": quantity,
+                    "Unit Price": unit_price,
+                    "Line Total": line_total,
+                }
+            )
+
+        # Handle simple string item structure
+        elif isinstance(item, str):
+
+            normalized_rows.append(
+                {
+                    "Item": item,
+                    "Quantity": "UNKNOWN",
+                    "Unit Price": "UNKNOWN",
+                    "Line Total": "UNKNOWN",
+                }
+            )
+
+    return normalized_rows
+
+
+# ============================================================
 # CREWAI RESULT HELPERS
 # ============================================================
 
@@ -385,11 +477,13 @@ def display_workflow_results(crew_result):
                 "**Extracted Invoice Details**"
             )
 
+
             # ------------------------------------------------
             # Basic invoice information
             # ------------------------------------------------
 
             invoice_columns = [
+
                 {
                     "Field": "Vendor",
                     "Value": extracted_data.get(
@@ -400,6 +494,7 @@ def display_workflow_results(crew_result):
                         ),
                     ),
                 },
+
                 {
                     "Field": "Invoice Number",
                     "Value": extracted_data.get(
@@ -407,6 +502,7 @@ def display_workflow_results(crew_result):
                         "UNKNOWN",
                     ),
                 },
+
                 {
                     "Field": "Invoice Date",
                     "Value": extracted_data.get(
@@ -414,6 +510,7 @@ def display_workflow_results(crew_result):
                         "UNKNOWN",
                     ),
                 },
+
                 {
                     "Field": "Due Date",
                     "Value": extracted_data.get(
@@ -421,6 +518,7 @@ def display_workflow_results(crew_result):
                         "UNKNOWN",
                     ),
                 },
+
                 {
                     "Field": "PO Number",
                     "Value": extracted_data.get(
@@ -431,6 +529,7 @@ def display_workflow_results(crew_result):
                         ),
                     ),
                 },
+
                 {
                     "Field": "Currency",
                     "Value": extracted_data.get(
@@ -438,6 +537,7 @@ def display_workflow_results(crew_result):
                         "UNKNOWN",
                     ),
                 },
+
                 {
                     "Field": "Subtotal",
                     "Value": extracted_data.get(
@@ -445,6 +545,7 @@ def display_workflow_results(crew_result):
                         "UNKNOWN",
                     ),
                 },
+
                 {
                     "Field": "Tax",
                     "Value": extracted_data.get(
@@ -452,6 +553,7 @@ def display_workflow_results(crew_result):
                         "UNKNOWN",
                     ),
                 },
+
                 {
                     "Field": "Shipping",
                     "Value": extracted_data.get(
@@ -459,6 +561,7 @@ def display_workflow_results(crew_result):
                         "UNKNOWN",
                     ),
                 },
+
                 {
                     "Field": "Total",
                     "Value": extracted_data.get(
@@ -466,6 +569,7 @@ def display_workflow_results(crew_result):
                         "UNKNOWN",
                     ),
                 },
+
                 {
                     "Field": "Payment Terms",
                     "Value": extracted_data.get(
@@ -491,44 +595,26 @@ def display_workflow_results(crew_result):
                 [],
             )
 
-            if items:
+            item_rows = normalize_items(
+                items
+            )
+
+            if item_rows:
 
                 st.write(
                     "**Invoice Items**"
                 )
 
-                item_rows = []
-
-                for item in items:
-
-                    item_rows.append(
-                        {
-                            "Item": item.get(
-                                "item_description",
-                                item.get(
-                                    "description",
-                                    "UNKNOWN",
-                                ),
-                            ),
-                            "Quantity": item.get(
-                                "quantity",
-                                "UNKNOWN",
-                            ),
-                            "Unit Price": item.get(
-                                "unit_price",
-                                "UNKNOWN",
-                            ),
-                            "Line Total": item.get(
-                                "line_total",
-                                "UNKNOWN",
-                            ),
-                        }
-                    )
-
                 st.dataframe(
                     item_rows,
                     use_container_width=True,
                     hide_index=True,
+                )
+
+            else:
+
+                st.warning(
+                    "No invoice items were extracted."
                 )
 
 
@@ -676,6 +762,7 @@ def display_workflow_results(crew_result):
                             "_",
                             " ",
                         ).title(),
+
                         "Result": (
                             "MATCHED"
                             if value
@@ -760,63 +847,79 @@ def display_workflow_results(crew_result):
             "Invoice record created successfully."
         )
 
+
         database_rows = [
+
             {
                 "Field": "Invoice ID",
                 "Value": latest_invoice[0],
             },
+
             {
                 "Field": "Vendor",
                 "Value": latest_invoice[1],
             },
+
             {
                 "Field": "Invoice Number",
                 "Value": latest_invoice[2],
             },
+
             {
                 "Field": "Invoice Date",
                 "Value": latest_invoice[3],
             },
+
             {
                 "Field": "Due Date",
                 "Value": latest_invoice[4],
             },
+
             {
                 "Field": "Currency",
                 "Value": latest_invoice[5],
             },
+
             {
                 "Field": "PO Number",
                 "Value": latest_invoice[6],
             },
+
             {
                 "Field": "Subtotal",
                 "Value": latest_invoice[8],
             },
+
             {
                 "Field": "Tax",
                 "Value": latest_invoice[9],
             },
+
             {
                 "Field": "Shipping",
                 "Value": latest_invoice[10],
             },
+
             {
                 "Field": "Total",
                 "Value": latest_invoice[11],
             },
+
             {
                 "Field": "Payment Terms",
                 "Value": latest_invoice[12],
             },
+
             {
                 "Field": "Extraction Status",
                 "Value": latest_invoice[13],
             },
+
             {
                 "Field": "Verification Status",
                 "Value": latest_invoice[14],
             },
+
             {
                 "Field": "Approval Status",
                 "Value": latest_invoice[15],
@@ -828,6 +931,33 @@ def display_workflow_results(crew_result):
             use_container_width=True,
             hide_index=True,
         )
+
+
+        # ----------------------------------------------------
+        # Database Invoice Items
+        # ----------------------------------------------------
+
+        database_items = normalize_items(
+            latest_invoice[7]
+        )
+
+        if database_items:
+
+            st.write(
+                "**Database Invoice Items**"
+            )
+
+            st.dataframe(
+                database_items,
+                use_container_width=True,
+                hide_index=True,
+            )
+
+        else:
+
+            st.warning(
+                "No invoice items found in the database."
+            )
 
 
 # ============================================================
