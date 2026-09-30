@@ -283,3 +283,29 @@ PENDING
 REJECTED
 
 Aur database update ho jata hai.
+
+                    GROQ LLM
+                       │
+       ┌───────────────┼────────────────┐
+       ↓               ↓                ↓
+    Agent 1          Agent 2          Agent 3
+       │               │                │
+ Classification     Extraction       Matching
+                       │                │
+                       ↓                ↓
+                  SQLite DB          PO JSON
+                       │
+                       ↓
+                Manager Approval
+                       │
+                       ↓
+                    Agent 4
+                       │
+                Approval Tools
+                       │
+                       ↓
+                  SQLite DB
+                       │
+              ┌────────┴────────┐
+              ↓                 ↓
+           APPROVED           REJECTED
