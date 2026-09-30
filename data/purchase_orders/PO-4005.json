@@ -4,13 +4,13 @@
     "currency": "USD",
     "items": [
         {
-            "item_description": "Keyboard",
+            "item_description": "Shoes",
             "quantity": 10,
             "unit_price": 40,
             "subtotal": 400
         },
         {
-            "item_description": "Mouse",
+            "item_description": "Shirt",
             "quantity": 10,
             "unit_price": 25,
             "subtotal": 250
