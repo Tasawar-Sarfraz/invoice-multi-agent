@@ -1,1 +1,15 @@
 
+{
+    "po_number": "PO-4004",
+    "vendor_name": "TATA Tech Solution",
+    "currency": "USD",
+    "items": [
+        {
+            "item_description": "Mouse",
+            "quantity": 20,
+            "unit_price": 50,
+            "subtotal": 1000
+        }
+    ],
+    "total": 1050
+}
