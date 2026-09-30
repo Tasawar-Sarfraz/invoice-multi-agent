@@ -8,6 +8,7 @@ import streamlit as st
 from tools.database_tool import (
     initialize_database,
     create_approval_token,
+    update_verification_status,
 )
 
 from crew.invoice_crew import (
@@ -220,14 +221,12 @@ def normalize_items(items):
     if not items:
         return []
 
-    # If items is stored as JSON text in the database
     if isinstance(items, str):
         try:
             items = json.loads(items)
         except (json.JSONDecodeError, TypeError):
             return []
 
-    # Make sure items is a list
     if not isinstance(items, list):
         return []
 
@@ -235,7 +234,6 @@ def normalize_items(items):
 
     for item in items:
 
-        # Handle dictionary-based item structure
         if isinstance(item, dict):
 
             item_description = (
@@ -273,7 +271,6 @@ def normalize_items(items):
                 }
             )
 
-        # Handle simple string item structure
         elif isinstance(item, str):
 
             normalized_rows.append(
@@ -359,7 +356,6 @@ def display_workflow_results(crew_result):
         "Workflow Result"
     )
 
-
     # ========================================================
     # AGENT 1
     # ========================================================
@@ -424,7 +420,6 @@ def display_workflow_results(crew_result):
                 security_flags
             )
 
-
     # ========================================================
     # AGENT 2
     # ========================================================
@@ -476,11 +471,6 @@ def display_workflow_results(crew_result):
             st.write(
                 "**Extracted Invoice Details**"
             )
-
-
-            # ------------------------------------------------
-            # Basic invoice information
-            # ------------------------------------------------
 
             invoice_columns = [
 
@@ -585,7 +575,6 @@ def display_workflow_results(crew_result):
                 hide_index=True,
             )
 
-
             # ------------------------------------------------
             # Invoice Items
             # ------------------------------------------------
@@ -617,7 +606,6 @@ def display_workflow_results(crew_result):
                     "No invoice items were extracted."
                 )
 
-
         uncertain_fields = extraction_result.get(
             "uncertain_fields",
             [],
@@ -633,7 +621,6 @@ def display_workflow_results(crew_result):
                 uncertain_fields
             )
 
-
         security_flags = extraction_result.get(
             "security_flags",
             [],
@@ -648,7 +635,6 @@ def display_workflow_results(crew_result):
             st.json(
                 security_flags
             )
-
 
     # ========================================================
     # AGENT 3
@@ -700,11 +686,6 @@ def display_workflow_results(crew_result):
             [],
         )
 
-
-        # ----------------------------------------------------
-        # Matching status
-        # ----------------------------------------------------
-
         if status == "MATCH":
 
             st.success(
@@ -726,11 +707,6 @@ def display_workflow_results(crew_result):
                 f"PO Matching Status: {status}"
             )
 
-
-        # ----------------------------------------------------
-        # Invoice / PO IDs
-        # ----------------------------------------------------
-
         col1, col2 = st.columns(2)
 
         with col1:
@@ -744,11 +720,6 @@ def display_workflow_results(crew_result):
             st.write(
                 f"**PO ID:** {po_id}"
             )
-
-
-        # ----------------------------------------------------
-        # Comparison
-        # ----------------------------------------------------
 
         if comparison:
 
@@ -777,11 +748,6 @@ def display_workflow_results(crew_result):
                 hide_index=True,
             )
 
-
-        # ----------------------------------------------------
-        # Mismatches
-        # ----------------------------------------------------
-
         if mismatches:
 
             st.write(
@@ -798,21 +764,11 @@ def display_workflow_results(crew_result):
                 "**Mismatches:** None"
             )
 
-
-        # ----------------------------------------------------
-        # Reason
-        # ----------------------------------------------------
-
         if reason:
 
             st.write(
                 f"**Reason:** {reason}"
             )
-
-
-        # ----------------------------------------------------
-        # Security flags
-        # ----------------------------------------------------
 
         if security_flags:
 
@@ -830,7 +786,6 @@ def display_workflow_results(crew_result):
                 "**Security Flags:** None"
             )
 
-
     # ========================================================
     # DATABASE STATUS
     # ========================================================
@@ -846,7 +801,6 @@ def display_workflow_results(crew_result):
         st.success(
             "Invoice record created successfully."
         )
-
 
         database_rows = [
 
@@ -932,7 +886,6 @@ def display_workflow_results(crew_result):
             hide_index=True,
         )
 
-
         # ----------------------------------------------------
         # Database Invoice Items
         # ----------------------------------------------------
@@ -1014,10 +967,66 @@ if st.button(
                 }
             )
 
-        display_workflow_results(
+        # ====================================================
+        # UPDATE VERIFICATION STATUS
+        # ====================================================
+        #
+        # Agent 3 is responsible only for validation.
+        # The application layer deterministically updates
+        # the database after receiving Agent 3's result.
+        #
+        # MATCH  -> VERIFIED
+        # Others -> FAILED
+        #
+        # ====================================================
+
+        task_results = extract_task_results(
             result
         )
 
+        matching_result = find_result_by_key(
+            task_results,
+            "comparison",
+        )
+
+        if matching_result:
+
+            verification_invoice_id = (
+                matching_result.get(
+                    "invoice_id"
+                )
+            )
+
+            matching_status = (
+                matching_result.get(
+                    "status"
+                )
+            )
+
+            if verification_invoice_id not in {
+                None,
+                "",
+                "UNKNOWN",
+            }:
+
+                if matching_status == "MATCH":
+
+                    verification_status = "VERIFIED"
+
+                else:
+
+                    verification_status = "FAILED"
+
+                update_verification_status(
+                    int(
+                        verification_invoice_id
+                    ),
+                    verification_status,
+                )
+
+        display_workflow_results(
+            result
+        )
 
         # ----------------------------------------------------
         # Recent Database Records
@@ -1064,7 +1073,6 @@ if approval_invoices:
         "Invoices"
     )
 
-
     # --------------------------------------------------------
     # All invoices table
     # --------------------------------------------------------
@@ -1074,7 +1082,6 @@ if approval_invoices:
         use_container_width=True,
         hide_index=True,
     )
-
 
     # --------------------------------------------------------
     # Select Invoice
@@ -1092,7 +1099,6 @@ if approval_invoices:
         for row in approval_invoices
     }
 
-
     selected_invoice = st.selectbox(
         "Select Invoice",
         options=list(
@@ -1100,31 +1106,25 @@ if approval_invoices:
         ),
     )
 
-
     selected_invoice_id = invoice_options[
         selected_invoice
     ]
 
-
-    # Find the complete selected invoice record.
     selected_invoice_data = next(
         row
         for row in approval_invoices
         if row["Invoice ID"] == selected_invoice_id
     )
 
-
     st.write(
         f"**Selected Invoice ID:** "
         f"{selected_invoice_id}"
     )
 
-
     st.write(
         f"**Current Approval Status:** "
         f"{selected_invoice_data['Approval Status']}"
     )
-
 
     # ========================================================
     # APPROVAL TOKEN
@@ -1133,7 +1133,6 @@ if approval_invoices:
     st.write(
         "### Approval Token"
     )
-
 
     if st.button(
         "Generate Approval Token",
@@ -1145,7 +1144,6 @@ if approval_invoices:
                 "Approval Status"
             ]
         )
-
 
         if current_status != "PENDING":
 
@@ -1160,7 +1158,6 @@ if approval_invoices:
             token = create_approval_token(
                 selected_invoice_id
             )
-
 
             if token:
 
@@ -1184,16 +1181,13 @@ if approval_invoices:
                     "Could not generate approval token."
                 )
 
-
     approval_token = st.text_input(
         "Approval Token",
         type="password",
         placeholder="Enter approval token...",
     )
 
-
     col1, col2 = st.columns(2)
-
 
     # ========================================================
     # APPROVE
@@ -1234,18 +1228,15 @@ if approval_invoices:
                         )
                     )
 
-
                 approval_raw = getattr(
                     approval_result,
                     "raw",
                     "",
                 )
 
-
                 st.subheader(
                     "Approval Result"
                 )
-
 
                 try:
 
@@ -1260,7 +1251,6 @@ if approval_invoices:
 
                     approval_data = None
 
-
                 if approval_data:
 
                     database_update = (
@@ -1269,7 +1259,6 @@ if approval_invoices:
                             "UNKNOWN",
                         )
                     )
-
 
                     if database_update == "SUCCESS":
 
@@ -1289,30 +1278,25 @@ if approval_invoices:
                             "Approval processing failed."
                         )
 
-
                     st.write(
                         f"**Invoice ID:** "
                         f"{approval_data.get('invoice_id', 'UNKNOWN')}"
                     )
-
 
                     st.write(
                         f"**Approval Status:** "
                         f"{approval_data.get('approval_status', 'UNKNOWN')}"
                     )
 
-
                     st.write(
                         f"**Database Update:** "
                         f"{database_update}"
                     )
 
-
                     st.write(
                         f"**Reason:** "
                         f"{approval_data.get('reason', '')}"
                     )
-
 
                     security_flags = (
                         approval_data.get(
@@ -1320,7 +1304,6 @@ if approval_invoices:
                             [],
                         )
                     )
-
 
                     if security_flags:
 
@@ -1332,7 +1315,6 @@ if approval_invoices:
                             security_flags
                         )
 
-
                 else:
 
                     st.warning(
@@ -1343,7 +1325,6 @@ if approval_invoices:
                     st.write(
                         approval_raw
                     )
-
 
     # ========================================================
     # REJECT
@@ -1384,18 +1365,15 @@ if approval_invoices:
                         )
                     )
 
-
                 approval_raw = getattr(
                     approval_result,
                     "raw",
                     "",
                 )
 
-
                 st.subheader(
                     "Approval Result"
                 )
-
 
                 try:
 
@@ -1410,7 +1388,6 @@ if approval_invoices:
 
                     approval_data = None
 
-
                 if approval_data:
 
                     database_update = (
@@ -1419,7 +1396,6 @@ if approval_invoices:
                             "UNKNOWN",
                         )
                     )
-
 
                     if database_update == "SUCCESS":
 
@@ -1439,30 +1415,25 @@ if approval_invoices:
                             "Rejection processing failed."
                         )
 
-
                     st.write(
                         f"**Invoice ID:** "
                         f"{approval_data.get('invoice_id', 'UNKNOWN')}"
                     )
-
 
                     st.write(
                         f"**Approval Status:** "
                         f"{approval_data.get('approval_status', 'UNKNOWN')}"
                     )
 
-
                     st.write(
                         f"**Database Update:** "
                         f"{database_update}"
                     )
 
-
                     st.write(
                         f"**Reason:** "
                         f"{approval_data.get('reason', '')}"
                     )
-
 
                     security_flags = (
                         approval_data.get(
@@ -1470,7 +1441,6 @@ if approval_invoices:
                             [],
                         )
                     )
-
 
                     if security_flags:
 
@@ -1482,7 +1452,6 @@ if approval_invoices:
                             security_flags
                         )
 
-
                 else:
 
                     st.warning(
@@ -1493,7 +1462,6 @@ if approval_invoices:
                     st.write(
                         approval_raw
                     )
-
 
 else:
 
