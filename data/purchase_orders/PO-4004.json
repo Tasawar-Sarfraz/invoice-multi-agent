@@ -5,7 +5,7 @@
     "currency": "USD",
     "items": [
         {
-            "item_description": "Mouse",
+            "item_description": "Mobile",
             "quantity": 20,
             "unit_price": 50,
             "subtotal": 1000
