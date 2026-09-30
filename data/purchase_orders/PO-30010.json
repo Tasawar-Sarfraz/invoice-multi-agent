@@ -7,8 +7,8 @@
             "item_description": "laptop",
             "quantity": 10,
             "unit_price": 150,
-            "line_total": 150
+            "line_total": 1500
         }
     ],
-    "total": 550
+    "total": 1540
 }
