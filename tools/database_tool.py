@@ -1,4 +1,3 @@
-
 import json
 import sqlite3
 import secrets
@@ -55,7 +54,6 @@ def initialize_database():
         """
     )
 
-    # Handle existing databases created by older versions.
     columns = {
         row[1]
         for row in cursor.execute(
@@ -65,12 +63,18 @@ def initialize_database():
 
     if "approval_token" not in columns:
         cursor.execute(
-            "ALTER TABLE invoices ADD COLUMN approval_token TEXT"
+            """
+            ALTER TABLE invoices
+            ADD COLUMN approval_token TEXT
+            """
         )
 
     if "approval_token_expires_at" not in columns:
         cursor.execute(
-            "ALTER TABLE invoices ADD COLUMN approval_token_expires_at TEXT"
+            """
+            ALTER TABLE invoices
+            ADD COLUMN approval_token_expires_at TEXT
+            """
         )
 
     connection.commit()
@@ -111,13 +115,18 @@ def create_invoice_record(invoice_data: dict) -> Optional[int]:
             invoice_data.get("due_date", "UNKNOWN"),
             invoice_data.get("currency", "UNKNOWN"),
             invoice_data.get("PO_number", "UNKNOWN"),
-            json.dumps(invoice_data.get("items", [])),
+            json.dumps(
+                invoice_data.get("items", [])
+            ),
             invoice_data.get("subtotal", "UNKNOWN"),
             invoice_data.get("tax", "UNKNOWN"),
             invoice_data.get("shipping", "UNKNOWN"),
             invoice_data.get("total", "UNKNOWN"),
             invoice_data.get("payment_terms", "UNKNOWN"),
-            invoice_data.get("extraction_status", "SUCCESS"),
+            invoice_data.get(
+                "extraction_status",
+                "SUCCESS",
+            ),
             "PENDING",
             "PENDING",
         ),
@@ -131,21 +140,23 @@ def create_invoice_record(invoice_data: dict) -> Optional[int]:
     return invoice_id
 
 
-def create_approval_token(invoice_id: int) -> Optional[str]:
+def update_verification_status(
+    invoice_id: int,
+    verification_status: str,
+) -> bool:
     """
-    Generate a secure approval token for a specific invoice.
+    Update invoice verification status after Agent 3 validation.
+    """
 
-    The token expires after APPROVAL_TOKEN_EXPIRY_MINUTES.
-    """
+    allowed_statuses = {
+        "VERIFIED",
+        "FAILED",
+    }
+
+    if verification_status not in allowed_statuses:
+        return False
 
     initialize_database()
-
-    token = secrets.token_urlsafe(32)
-
-    expires_at = (
-        datetime.now(timezone.utc)
-        + timedelta(minutes=APPROVAL_TOKEN_EXPIRY_MINUTES)
-    ).isoformat()
 
     connection = get_connection()
     cursor = connection.cursor()
@@ -153,11 +164,68 @@ def create_approval_token(invoice_id: int) -> Optional[str]:
     cursor.execute(
         """
         UPDATE invoices
-        SET
-            approval_token = ?,
+        SET verification_status = ?
+        WHERE invoice_id = ?
+        """,
+        (
+            verification_status,
+            invoice_id,
+        ),
+    )
+
+    updated = cursor.rowcount > 0
+
+    connection.commit()
+    connection.close()
+
+    return updated
+
+
+def create_approval_token(
+    invoice_id: int,
+) -> Optional[str]:
+    initialize_database()
+
+    connection = get_connection()
+    cursor = connection.cursor()
+
+    cursor.execute(
+        """
+        SELECT approval_status
+        FROM invoices
+        WHERE invoice_id = ?
+        """,
+        (invoice_id,),
+    )
+
+    row = cursor.fetchone()
+
+    if row is None:
+        connection.close()
+        return None
+
+    approval_status = row[0]
+
+    if approval_status != "PENDING":
+        connection.close()
+        return None
+
+    token = secrets.token_urlsafe(32)
+
+    expires_at = (
+        datetime.now(timezone.utc)
+        + timedelta(
+            minutes=APPROVAL_TOKEN_EXPIRY_MINUTES
+        )
+    ).isoformat()
+
+    cursor.execute(
+        """
+        UPDATE invoices
+        SET approval_token = ?,
             approval_token_expires_at = ?
         WHERE invoice_id = ?
-        AND approval_status = 'PENDING'
+          AND approval_status = 'PENDING'
         """,
         (
             token,
@@ -177,149 +245,159 @@ def create_approval_token(invoice_id: int) -> Optional[str]:
     return token
 
 
-def validate_approval_token(
+def process_approval(
     invoice_id: int,
     approval_token: str,
+    decision: str,
 ) -> dict:
-    """
-    Validate an approval token before allowing approval/rejection.
-
-    Checks:
-    1. Invoice exists
-    2. Invoice is still PENDING
-    3. Token matches
-    4. Token has not expired
-    """
-
     initialize_database()
 
-    connection = get_connection()
-    cursor = connection.cursor()
+    decision = decision.strip().upper()
 
-    cursor.execute(
-        """
-        SELECT
-            approval_token,
-            approval_token_expires_at,
-            approval_status
-        FROM invoices
-        WHERE invoice_id = ?
-        """,
-        (invoice_id,),
-    )
-
-    row = cursor.fetchone()
-
-    connection.close()
-
-    if row is None:
-        return {
-            "valid": False,
-            "reason": "Invoice not found.",
-        }
-
-    stored_token, expires_at, approval_status = row
-
-    if approval_status != "PENDING":
-        return {
-            "valid": False,
-            "reason": "Invoice has already been processed.",
-        }
-
-    if not stored_token:
-        return {
-            "valid": False,
-            "reason": "No approval token exists for this invoice.",
-        }
-
-    if not approval_token or not secrets.compare_digest(
-        stored_token,
-        approval_token,
-    ):
-        return {
-            "valid": False,
-            "reason": "Invalid approval token.",
-        }
-
-    if not expires_at:
-        return {
-            "valid": False,
-            "reason": "Approval token has no expiry information.",
-        }
-
-    try:
-        expiry_time = datetime.fromisoformat(expires_at)
-
-        if datetime.now(timezone.utc) >= expiry_time:
-            return {
-                "valid": False,
-                "reason": "Approval token has expired.",
-            }
-
-    except ValueError:
-        return {
-            "valid": False,
-            "reason": "Invalid token expiry information.",
-        }
-
-    return {
-        "valid": True,
-        "reason": "Approval token is valid.",
-    }
-
-
-def update_approval_status(
-    invoice_id: int,
-    approval_token: str,
-    approval_status: str,
-) -> bool:
-    """
-    Update invoice approval status only after token validation.
-    """
-
-    allowed_statuses = {
+    if decision not in {
         "APPROVED",
         "REJECTED",
-    }
-
-    if approval_status not in allowed_statuses:
-        return False
-
-    validation = validate_approval_token(
-        invoice_id,
-        approval_token,
-    )
-
-    if not validation["valid"]:
-        return False
-
-    initialize_database()
+    }:
+        return {
+            "status": "FAILED",
+            "reason": "Invalid approval decision.",
+            "security_flags": [],
+        }
 
     connection = get_connection()
     cursor = connection.cursor()
 
-    cursor.execute(
-        """
-        UPDATE invoices
-        SET
-            approval_status = ?,
-            approval_token = NULL,
-            approval_token_expires_at = NULL
-        WHERE invoice_id = ?
-        AND approval_token = ?
-        AND approval_status = 'PENDING'
-        """,
+    try:
+        cursor.execute(
+            """
+            SELECT
+                approval_status,
+                approval_token,
+                approval_token_expires_at
+            FROM invoices
+            WHERE invoice_id = ?
+            """,
+            (invoice_id,),
+        )
+
+        row = cursor.fetchone()
+
+        if row is None:
+            return {
+                "status": "FAILED",
+                "reason": "Invoice not found.",
+                "security_flags": [
+                    "INVOICE_NOT_FOUND"
+                ],
+            }
+
         (
             approval_status,
-            invoice_id,
-            approval_token,
-        ),
-    )
+            stored_token,
+            expires_at,
+        ) = row
 
-    updated = cursor.rowcount > 0
+        if approval_status != "PENDING":
+            return {
+                "status": "NOT_PERMITTED",
+                "reason": (
+                    "Invoice has already been processed."
+                ),
+                "security_flags": [
+                    "DUPLICATE_PROCESSING"
+                ],
+            }
 
-    connection.commit()
-    connection.close()
+        if not stored_token or approval_token != stored_token:
+            return {
+                "status": "FAILED",
+                "reason": "Invalid approval token.",
+                "security_flags": [
+                    "INVALID_TOKEN"
+                ],
+            }
 
-    return updated
+        if not expires_at:
+            return {
+                "status": "FAILED",
+                "reason": "Approval token has no expiry.",
+                "security_flags": [
+                    "INVALID_TOKEN_EXPIRY"
+                ],
+            }
+
+        try:
+            expiry_datetime = datetime.fromisoformat(
+                expires_at
+            )
+
+            if (
+                expiry_datetime.tzinfo is None
+            ):
+                expiry_datetime = expiry_datetime.replace(
+                    tzinfo=timezone.utc
+                )
+
+        except ValueError:
+            return {
+                "status": "FAILED",
+                "reason": "Invalid approval token expiry.",
+                "security_flags": [
+                    "INVALID_TOKEN_EXPIRY"
+                ],
+            }
+
+        if (
+            datetime.now(timezone.utc)
+            >= expiry_datetime
+        ):
+            return {
+                "status": "FAILED",
+                "reason": "Approval token has expired.",
+                "security_flags": [
+                    "EXPIRED_TOKEN"
+                ],
+            }
+
+        cursor.execute(
+            """
+            UPDATE invoices
+            SET approval_status = ?,
+                approval_token = NULL,
+                approval_token_expires_at = NULL
+            WHERE invoice_id = ?
+              AND approval_status = 'PENDING'
+              AND approval_token = ?
+            """,
+            (
+                decision,
+                invoice_id,
+                approval_token,
+            ),
+        )
+
+        if cursor.rowcount != 1:
+            connection.rollback()
+
+            return {
+                "status": "NOT_PERMITTED",
+                "reason": (
+                    "Invoice has already been processed."
+                ),
+                "security_flags": [
+                    "DUPLICATE_PROCESSING"
+                ],
+            }
+
+        connection.commit()
+
+        return {
+            "status": "SUCCESS",
+            "invoice_id": str(invoice_id),
+            "approval_status": decision,
+            "security_flags": [],
+        }
+
+    finally:
+        connection.close()
 
