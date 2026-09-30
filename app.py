@@ -1,3 +1,4 @@
+
 import json
 import sqlite3
 from pathlib import Path
@@ -98,9 +99,6 @@ def get_pending_invoices():
 
     connection.close()
 
-    # Convert database rows into dictionaries.
-    # This guarantees that each value stays under
-    # its correct column name.
     return [
         {
             "Invoice ID": row[0],
@@ -139,9 +137,6 @@ def get_recent_invoices():
 
     connection.close()
 
-    # Convert database rows into dictionaries.
-    # Column names are now directly connected
-    # to the correct database values.
     return [
         {
             "Invoice ID": row[0],
@@ -153,6 +148,49 @@ def get_recent_invoices():
             "Extraction Status": row[6],
             "Verification Status": row[7],
             "Approval Status": row[8],
+        }
+        for row in rows
+    ]
+
+
+def get_approval_invoices():
+    """
+    Get all invoices for the Manager Approval section.
+
+    Previously approved/rejected invoices remain visible so
+    their current status can be checked and duplicate approval
+    attempts can be tested.
+    """
+
+    connection = sqlite3.connect(database_path)
+    cursor = connection.cursor()
+
+    rows = cursor.execute(
+        """
+        SELECT
+            invoice_id,
+            invoice_number,
+            vendor_name,
+            po_number,
+            total,
+            currency,
+            approval_status
+        FROM invoices
+        ORDER BY invoice_id DESC
+        """
+    ).fetchall()
+
+    connection.close()
+
+    return [
+        {
+            "Invoice ID": row[0],
+            "Invoice Number": row[1],
+            "Vendor": row[2],
+            "PO Number": row[3],
+            "Total": row[4],
+            "Currency": row[5],
+            "Approval Status": row[6],
         }
         for row in rows
     ]
@@ -887,22 +925,22 @@ st.header(
 )
 
 
-pending_invoices = get_pending_invoices()
+approval_invoices = get_approval_invoices()
 
 
-if pending_invoices:
+if approval_invoices:
 
     st.subheader(
-        "Pending Invoices"
+        "Invoices"
     )
 
 
     # --------------------------------------------------------
-    # Pending invoices table
+    # All invoices table
     # --------------------------------------------------------
 
     st.dataframe(
-        pending_invoices,
+        approval_invoices,
         use_container_width=True,
         hide_index=True,
     )
@@ -913,10 +951,17 @@ if pending_invoices:
     # --------------------------------------------------------
 
     invoice_options = {
-        f"{row['Invoice Number']} — {row['Vendor']}":
+        (
+            f"Invoice {row['Invoice ID']} — "
+            f"{row['Invoice Number']} — "
+            f"{row['Vendor']} — "
+            f"{row['Total']} {row['Currency']} — "
+            f"{row['Approval Status']}"
+        ):
         row["Invoice ID"]
-        for row in pending_invoices
+        for row in approval_invoices
     }
+
 
     selected_invoice = st.selectbox(
         "Select Invoice",
@@ -925,9 +970,30 @@ if pending_invoices:
         ),
     )
 
+
     selected_invoice_id = invoice_options[
         selected_invoice
     ]
+
+
+    # Find the complete selected invoice record.
+    selected_invoice_data = next(
+        row
+        for row in approval_invoices
+        if row["Invoice ID"] == selected_invoice_id
+    )
+
+
+    st.write(
+        f"**Selected Invoice ID:** "
+        f"{selected_invoice_id}"
+    )
+
+
+    st.write(
+        f"**Current Approval Status:** "
+        f"{selected_invoice_data['Approval Status']}"
+    )
 
 
     # ========================================================
@@ -944,31 +1010,49 @@ if pending_invoices:
         use_container_width=True,
     ):
 
-        token = create_approval_token(
-            selected_invoice_id
+        current_status = (
+            selected_invoice_data[
+                "Approval Status"
+            ]
         )
 
-        if token:
 
-            st.success(
-                f"Approval token generated for "
-                f"Invoice ID {selected_invoice_id}."
-            )
+        if current_status != "PENDING":
 
-            st.code(
-                token,
-                language="text",
-            )
-
-            st.info(
-                "Copy this token and enter it below."
+            st.warning(
+                f"Invoice {selected_invoice_id} is already "
+                f"{current_status}. "
+                "A new approval token cannot be generated."
             )
 
         else:
 
-            st.error(
-                "Could not generate approval token."
+            token = create_approval_token(
+                selected_invoice_id
             )
+
+
+            if token:
+
+                st.success(
+                    f"Approval token generated for "
+                    f"Invoice ID {selected_invoice_id}."
+                )
+
+                st.code(
+                    token,
+                    language="text",
+                )
+
+                st.info(
+                    "Copy this token and enter it below."
+                )
+
+            else:
+
+                st.error(
+                    "Could not generate approval token."
+                )
 
 
     approval_token = st.text_input(
@@ -1081,15 +1165,18 @@ if pending_invoices:
                         f"{approval_data.get('invoice_id', 'UNKNOWN')}"
                     )
 
+
                     st.write(
                         f"**Approval Status:** "
                         f"{approval_data.get('approval_status', 'UNKNOWN')}"
                     )
 
+
                     st.write(
                         f"**Database Update:** "
                         f"{database_update}"
                     )
+
 
                     st.write(
                         f"**Reason:** "
@@ -1103,6 +1190,7 @@ if pending_invoices:
                             [],
                         )
                     )
+
 
                     if security_flags:
 
@@ -1227,15 +1315,18 @@ if pending_invoices:
                         f"{approval_data.get('invoice_id', 'UNKNOWN')}"
                     )
 
+
                     st.write(
                         f"**Approval Status:** "
                         f"{approval_data.get('approval_status', 'UNKNOWN')}"
                     )
 
+
                     st.write(
                         f"**Database Update:** "
                         f"{database_update}"
                     )
+
 
                     st.write(
                         f"**Reason:** "
@@ -1249,6 +1340,7 @@ if pending_invoices:
                             [],
                         )
                     )
+
 
                     if security_flags:
 
@@ -1276,6 +1368,6 @@ if pending_invoices:
 else:
 
     st.info(
-        "No pending invoices available "
-        "for manager approval."
+        "No invoices available."
     )
+
